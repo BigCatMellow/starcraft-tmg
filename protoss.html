@@ -8,13 +8,17 @@
   <meta name="theme-color" content="#1a1a1a">
   <title>Protoss Army Builder - StarCraft: TMG</title>
   <link rel="manifest" href="manifest.json">
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+.home-btn { position: fixed; top: 12px; left: 12px; width: 40px; height: 40px; border-radius: 10px; background: #242424; border: 1px solid #3a3a3a; color: #f0eee8; font-size: 1.2rem; display: grid; place-items: center; cursor: pointer; z-index: 100; text-decoration: none; }
+.home-btn:hover { background: #2a2a2a; border-color: #eab308; }
+</style>
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel" data-presets="react">
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+  <script type="text/babel">
 const { useState, useEffect, useCallback } = React;
 
 
@@ -517,7 +521,7 @@ const ArmyTacticalCard = ({ card, onRemove, onKeywordClick }) => {
 // ============================================================================
 // MAIN APP
 // ============================================================================
-export default function App() {
+function App() {
   const [selectedFaction, setSelectedFaction] = useState(PROTOSS_FACTION_CARDS[0]);
   const [selectedScale, setSelectedScale] = useState(ENGAGEMENT_SCALES[1]);
   const [armyUnits, setArmyUnits] = useState([]);
@@ -711,8 +715,7 @@ export default function App() {
   const tacticalIdsInArmy = armyTactical.map(t => t.id);
 
   return (
-    <div className="app">
-      <a href="index.html" className="home-btn" title="Home">←</a>
+    <div className="app"><a href="index.html" className="home-btn" title="Home">←</a>
       <style>{`
         :root { --bg:#1a1a1a; --panel:#242424; --panel-2:#2a2a2a; --panel-3:#303030; --text:#f0eee8; --muted:#a8a299; --border:#3a3a3a; --accent:#eab308; --protoss-accent:#ca8a04; --success:#22c55e; --warning:#eab308; --error:#ef4444; --gas:#22d3ee; --radius:16px; --radius-sm:10px; --role-hero:#f59e0b; --role-elite:#a855f7; --role-core:#3b82f6; --role-support:#22c55e; --role-other:#6b7280; --tactical:#06b6d4; --glossary:#ec4899; }
         * { box-sizing:border-box; margin:0; padding:0; }
