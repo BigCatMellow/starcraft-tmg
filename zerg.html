@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a1a">
+  <title>Zerg Army Builder - StarCraft: TMG</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+
+
+// ============================================================================
+// DATA: Keywords Glossary
+// ============================================================================
+const KEYWORDS = {
+  'ANTI-EVADE': { type: 'Combat', description: 'The target suffers -X to its Evade Rolls for this attack.' },
+  'BUFF': { type: 'Effect', description: 'The Unit gains a bonus of X to the specified Characteristic until End of the Round.' },
+  'BURROWED': { type: 'Status', description: 'The unit becomes HIDDEN and counts as Size 0. For Disengage checks it counts as Supply 0. It cannot contest or control Mission Markers. It gets an Evade Roll against every attack.' },
+  'CRITICAL HIT': { type: 'Combat', description: 'Move X dice directly from the Armour Pool to the Damage Pool, bypassing armour.' },
+  'DEBUFF': { type: 'Effect', description: 'The Unit suffers a penalty of X to the specified Characteristic until End of the Round.' },
+  'DISPLACEMENT': { type: 'Movement', description: 'This model/token can be moved through by other models and does not block movement.' },
+  'FLYING': { type: 'Status', description: 'Flying units ignore terrain when moving, are never Engaged, cannot Charge or be Charged, and cannot contest or control Mission Markers.' },
+  'HEAL': { type: 'Effect', description: 'Remove X points of accumulated Damage from the Unit. HEAL cannot return Destroyed models.' },
+  'HIDDEN': { type: 'Status', description: 'Enemies more than 4" away cannot target this unit with ranged attacks or Line of Sight abilities. The unit is immune to IMPACT and gets an Evade Roll against every attack.' },
+  'IMPACT': { type: 'Combat', description: 'After a successful Charge, each eligible model generates X extra dice. Rolls of Y or higher become automatic hits placed in the Armour Pool.' },
+  'INSTANT': { type: 'Weapon', description: 'This weapon resolves immediately, typically granting the INSTANT keyword to close combat weapons for the active unit.' },
+  'LONG RANGE': { type: 'Weapon', description: 'The weapon\'s maximum range extends to X inches, but shots beyond the normal listed range suffer a -1 Hit penalty.' },
+  'ON CREEP': { type: 'Zerg', description: 'A Ground Zerg Unit is ON CREEP while Within 6" of any Creep Tumor Token or Source of Creep (like Omega Worm).' },
+  'PLACE': { type: 'Movement', description: 'Remove the Leading Model and set it Wholly Within X inches of its starting point. PLACE ignores normal pathing, gap clearance, terrain restrictions, and elevation requirements, then the unit is rebuilt in Coherency.' },
+  'PRECISION': { type: 'Combat', description: 'After rolling to hit, move up to X missed dice into the Armour Pool. They still need to survive armour.' },
+  'RESPAWN': { type: 'Effect', description: 'Return up to X Destroyed models to the Unit. Cannot increase the Unit into a higher Supply bracket.' },
+  'SHIELDED': { type: 'Status', description: 'The first model in the unit gets extra Hit Points equal to its Shield value. The status ends when that shield is broken or the first model is removed.' },
+  'STATIONARY': { type: 'Status', description: 'All units start each round Stationary. The status is lost the moment the unit moves, is moved, or is placed.' },
+  'STAY IN PLAY': { type: 'Other', description: 'This token or marker persists through cleanup instead of being removed at the end of the round.' },
+  'SUMMON': { type: 'Movement', description: 'Create the named unit adjacent to the parent unit. It must be placed legally, with enough Available Supply, and usually gains an Activation Marker.' },
+  'TOUGH': { type: 'Combat', description: 'When making Armour Rolls, convert up to X failed results into successes.' },
+};
+
+const TAGS = {
+  'Armoured': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Armoured deal bonus damage that bypasses armour when attacking this unit.' },
+  'Biological': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Biological deal bonus damage that bypasses armour when attacking this unit.' },
+  'Flying': { type: 'Combat Tag', description: 'Flying units are never Engaged and cannot Engage. They cannot Charge or be Charged. They ignore terrain and Gap Clearance during movement. They do not participate in the Combat Phase. They cannot Contest or Control Mission Markers. They never benefit from High Ground Cover. Must end movement at least 1" from enemy Flying units.' },
+  'Ground': { type: 'Combat Tag', description: 'Ground units can Engage other Ground units when Within 1". Weapons with Target: Ground can only hit units with this tag. Ground units participate in the Combat Phase when Engaged.' },
+  'Light': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Light deal bonus damage that bypasses armour when attacking this unit.' },
+  'Mechanical': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Mechanical deal bonus damage that bypasses armour when attacking this unit.' },
+  'Psionic': { type: 'Special Tag', description: 'This unit has psychic abilities. Used as a marker for ability targeting — certain abilities specifically affect or reference Psionic units. Does not affect Surge damage.' },
+  'Unique': { type: 'Special Tag', description: 'Only one of this unit may be included in your army list.' },
+};
+
+const SURGE_TAGS = ['Armoured', 'Biological', 'Light', 'Mechanical'];
+const TYPE_TAGS = ['Ground', 'Flying'];
+
+// ============================================================================
+// DATA: Engagement Scales
+// ============================================================================
+const ENGAGEMENT_SCALES = [
+  { id: 'skirmish', name: 'Skirmish', minerals: 1000, gas: 100, table: '36" × 36"' },
+  { id: 'standard', name: 'Standard', minerals: 2000, gas: 200, table: '36" × 54"' },
+  { id: 'grand', name: 'Grand Offensive', minerals: 9999, gas: 999, table: '36" × 72"' },
+];
+
+// ============================================================================
+// DATA: Faction Cards
+// ============================================================================
+const ZERG_FACTION_CARDS = [
+  { id: 'kerrigans-swarm', name: "Kerrigan's Swarm", unique: true, resource: '+1 BM', slots: { hero: 1, elite: 2, core: 3 },
+    abilities: [
+      { phase: 'Any Phase', name: 'Wild Mutation', type: 'Active', description: 'If the active unit is ON CREEP, the Unit gains BUFF Speed (1) and its first Weapon used gains PRECISION (1).' },
+      { phase: 'Any Phase', name: 'Zerg Creep', type: 'Passive', description: 'During Army Building, select exactly one Creep Card and add it to their Army List, paying its listed cost (if any).' },
+      { phase: 'Movement Phase', name: 'Omega Network', type: 'Active', description: 'If there is no Friendly Omega Worm on the battlefield, place a Friendly Omega Worm Unit anywhere on GROUND LEVEL of the battlefield, more than 10" away from any Enemy model.' }
+    ]
+  },
+  { id: 'zerg-swarm', name: 'Zerg Swarm', unique: true, resource: '+1 BM', slots: { elite: 1, core: 3, support: 1 },
+    abilities: [
+      { phase: 'Any Phase', name: 'Brood Instinct', type: 'Reaction', description: 'Use before a Friendly Unit makes an Evade Roll. Apply a +1 Modifier to that roll.' },
+      { phase: 'Any Phase', name: 'Zerg Creep', type: 'Passive', description: 'During Army Building, select exactly one Creep Card and add it to their Army List, paying its listed cost (if any).' },
+      { phase: 'Movement Phase', name: 'Rapid Burrowing', type: 'Active', description: 'Select one Friendly, Unengaged Ground Zerg Unit on the battlefield. That Unit gains the Burrowed Status, even if it has already been Activated this Round.' }
+    ]
+  }
+];
+
+// ============================================================================
+// DATA: Unit Cards (12 total)
+// ============================================================================
+const ZERG_UNITS = [
+  // HERO
+  { id: 'kerrigan', name: 'Kerrigan', role: 'Hero', unique: true, tags: ['Biological', 'Psionic', 'Ground'],
+    stats: { shield: null, speed: '7', evade: '6+', armour: '5+', hp: 9, size: 2 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 250, models: '1', supply: 1 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
+    weapons: [
+      { name: 'Energy Blast', phase: 'Assault', range: '8', target: 'All', roa: 5, hit: '3+', surge: 'Light, Armoured', sDie: 'D3', damage: 1, keywords: [] },
+      { name: 'Blades', phase: 'Combat', range: 'E', target: 'Ground', roa: 6, hit: '4+', surge: '-', sDie: '-', damage: 2, keywords: ['CRITICAL HIT (2)'] }
+    ],
+    abilities: [{ phase: 'Any Phase', name: 'Commander', type: 'Passive', description: "Treat this Unit's Supply characteristic as increased by 1 for Controlling and Contesting Mission Markers, completing objectives, and resolving Disengage checks." }],
+    phaseAbilities: {
+      'Movement Phase': [
+        { name: 'Crushing Grip', type: 'Active (1 Biomass)', description: 'Select one Enemy Unit Within 12". That Unit counts as Activated in this Phase.' },
+        { name: 'Mutating Carapace', type: 'Active (1 Biomass)', description: 'Select one Enemy Unit Within 18". This Unit is eligible to make an Evade Roll against all attacks made by the selected Enemy Unit, with a +2 Modifier applied to those Evade Rolls.' }
+      ],
+      'Assault Phase': [
+        { name: 'Leaping Strike', type: 'Active (1 Biomass)', description: 'If Unengaged, resolve the PLACE (6) effect.' },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (4) 4+ effect.' }
+      ]
+    },
+    upgrades: {}
+  },
+
+  // ELITE
+  { id: 'hydralisk', name: 'Hydralisk', role: 'Elite', tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '4/8', evade: '5+', armour: '5+', hp: 4, size: 2 },
+    tiers: [{ tier: 'T3', cost: 260, models: '3-4', supply: 3 }, { tier: 'T2', cost: 140, models: '2', supply: 2 }, { tier: 'T1', cost: null, models: '1', supply: 1 }],
+    weapons: [
+      { name: 'Needle Spines', phase: 'Assault', range: '12', target: 'All', roa: 3, hit: '3+', surge: 'Light, Armoured', sDie: 'D3+1', damage: 2, keywords: [] },
+      { name: 'Scythe', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+    ],
+    abilities: [{ phase: 'Any Phase', name: 'Squadron', type: 'Passive', description: "This Unit's Horizontal Coherency is 4\"." }],
+    phaseAbilities: {
+      'Assault Phase': [{ name: 'Lunge', type: 'Reaction (1 Biomass)', description: 'When another Friendly Unit Within 10" is the target of a Ranged Attack, after the attack is fully resolved, this Unit, if Unengaged, may perform a Move action Directly Towards the attacking Unit.' }]
+    },
+    upgrades: {
+      'Any Phase': [
+        { name: 'Ancillary Carapace', cost: '20/40', type: 'Passive', description: 'This Unit gains TOUGH (1) on the first Armour Roll of each Activation.' },
+        { name: 'Lurking', cost: '10/20', type: 'Passive', description: 'If this Unit has Stationary Status, it is eligible to make an Evade Roll against the first Ranged Attack targeting it this Round. If this Unit is ON CREEP, it gains +1 Modifier to this Evade Roll.' }
+      ],
+      'Movement Phase': [{ name: 'Burrow Ambush', cost: '20/40', type: 'Passive', description: "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends." }],
+      'Assault Phase': [{ name: 'Grooved Spines', cost: '20/40', type: 'Passive', description: 'This Unit\'s Needle Spines ranged weapon gains LONG RANGE (16").' }]
+    }
+  },
+  { id: 'raptor', name: 'Raptor (Zergling)', role: 'Elite', tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '5/9', evade: '4+', armour: '6+', hp: 1, size: 1 },
+    tiers: [{ tier: 'T3', cost: 300, models: '13-18', supply: 2 }, { tier: 'T2', cost: 240, models: '7-12', supply: 1 }, { tier: 'T1', cost: null, models: '1-6', supply: 0 }],
+    weapons: [{ name: 'Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: 'Light', sDie: 'D3', damage: 1, keywords: [] }],
+    abilities: [
+      { phase: 'Any Phase', name: 'Squadron', type: 'Passive', description: "This Unit's Horizontal Coherency is 4\"." },
+      { phase: 'Any Phase', name: 'Raptor Strain', type: 'Passive', description: 'This Unit can move through IMPASSABLE TERRAIN of Size 4 or less and change elevation without using ACCESS POINTS.' }
+    ],
+    phaseAbilities: {
+      'Assault Phase': [
+        { name: 'Adrenal Overload', type: 'Active (1 Biomass)', description: 'This Unit gains a +1 Modifier to all IMPACT Hit Rolls.' },
+        { name: 'Metabolic Boost', type: 'Active (1 Biomass)', description: "When determining Charge Distance for this Unit, roll 2D6 instead of D6 and use the higher result to add to the Unit's Speed characteristic." },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (1) 5+ effect.' }
+      ]
+    },
+    upgrades: {
+      'Movement Phase': [{ name: 'Burrow Ambush', cost: '20/30', type: 'Passive', description: "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends." }],
+      'Combat Phase': [
+        { name: 'Shredding Claws', cost: 20, type: 'Weapon', description: 'Replaces Claws. Surge: Light, Armoured. S.Die: D3.', modifies: { weapon: 'Claws', changes: { surge: 'Light, Armoured' } } },
+        { name: 'Adrenal Glands', cost: 30, type: 'Passive', description: "This Unit's Claws and Shredding Claws weapons gain PRECISION (2)." }
+      ]
+    }
+  },
+  { id: 'kerrigan-raptor', name: "Kerrigan's Raptor (Zergling)", role: 'Elite', unique: true, factionTag: "Kerrigan's Swarm", tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '5/9', evade: '4+', armour: '5+', hp: 2, size: 1 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 250, models: '4-6', supply: 1 }, { tier: 'T1', cost: null, models: '1-3', supply: 0 }],
+    weapons: [{ name: 'Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '3+', surge: 'Light, Armoured', sDie: 'D6', damage: 1, keywords: ['INSTANT'] }],
+    abilities: [
+      { phase: 'Any Phase', name: 'Squadron', type: 'Passive', description: "This Unit's Horizontal Coherency is 4\"." },
+      { phase: 'Any Phase', name: 'Raptor Strain', type: 'Passive', description: 'This Unit can move through IMPASSABLE TERRAIN of Size 4 or less and change elevation without using ACCESS POINTS.' }
+    ],
+    phaseAbilities: {
+      'Assault Phase': [
+        { name: 'Leap', type: 'Active (1 Biomass)', description: 'When determining Charge Distance for this Unit, add 2 to the Charge Distance.' },
+        { name: 'Adrenal Overload', type: 'Active (1 Biomass)', description: 'This Unit gains a +1 Modifier to all IMPACT Hit Rolls.' },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (2) 5+ effect.' }
+      ]
+    },
+    upgrades: {}
+  },
+
+  // CORE
+  { id: 'corpser', name: 'Corpser (Roach)', role: 'Core', tags: ['Armoured', 'Biological', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '5+', armour: '3+', hp: 4, size: 2 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 250, models: '2-3', supply: 1 }, { tier: 'T1', cost: null, models: '1', supply: 0 }],
+    weapons: [
+      { name: 'Acid Saliva', phase: 'Assault', range: '8', target: 'Ground', roa: 2, hit: '3+', surge: '-', sDie: '-', damage: 1, keywords: [] },
+      { name: 'Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 3, hit: '4+', surge: 'Light', sDie: 'D3+1', damage: 1, keywords: [] }
+    ],
+    abilities: [{ phase: 'Any Phase', name: 'Burrow', type: 'Active (2 Biomass)', description: 'If this Unit is Unengaged, it gains or loses the Burrowed Status.' }],
+    phaseAbilities: {
+      'Movement Phase': [{ name: 'Roachling Infestation', type: 'Active (2 Biomass)', description: 'Once per Game. Resolve the SUMMON (Roachling) effect.' }],
+      'Assault Phase': [
+        { name: 'Regeneration', type: 'Passive', description: 'When this Unit becomes Activated, if it has the Burrowed Status, resolve the HEAL (2) effect.' },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (3) 4+ effect.' }
+      ]
+    },
+    upgrades: {
+      'Any Phase': [{ name: 'Tunneling Claws', cost: 10, type: 'Passive', description: "While this Unit has the Burrowed Status, it may perform the Move and Run actions without losing that Status. It may also move through other Units' bases." }],
+      'Movement Phase': [
+        { name: 'Burrow Ambush', cost: 20, type: 'Passive', description: "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends." },
+        { name: 'Glial Reconstitution', cost: 20, type: 'Active (1 Biomass)', description: 'This Unit gains BUFF SPEED (1), or BUFF SPEED (2) if the Unit is ON CREEP.' }
+      ],
+      'Assault Phase': [{ name: 'Hydriodic Bile', cost: 10, type: 'Passive', description: "This Unit's Acid Saliva weapon gains Surge Type: Light, and S Dice: D3+1.", modifies: { weapon: 'Acid Saliva', changes: { surge: 'Light', sDie: 'D3+1' } } }]
+    }
+  },
+  { id: 'roach', name: 'Roach', role: 'Core', tags: ['Armoured', 'Biological', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '5+', armour: '3+', hp: 4, size: 2 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 170, models: '2-3', supply: 1 }, { tier: 'T1', cost: null, models: '1', supply: 0 }],
+    weapons: [
+      { name: 'Acid Saliva', phase: 'Assault', range: '8', target: 'Ground', roa: 3, hit: '3+', surge: '-', sDie: '-', damage: 1, keywords: [] },
+      { name: 'Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+    ],
+    abilities: [{ phase: 'Any Phase', name: 'Burrow', type: 'Active (2 Biomass)', description: 'If this Unit is Unengaged, it gains or loses the Burrowed Status.' }],
+    phaseAbilities: {
+      'Assault Phase': [
+        { name: 'Regeneration', type: 'Passive', description: 'When this Unit becomes Activated, if it has the Burrowed Status, resolve the HEAL (2) effect.' },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (2) 4+ effect.' }
+      ]
+    },
+    upgrades: {
+      'Any Phase': [{ name: 'Tunneling Claws', cost: 10, type: 'Passive', description: "While this Unit has the Burrowed Status, it may perform the Move and Run actions without losing that Status. It may also move through other Units' bases." }],
+      'Movement Phase': [
+        { name: 'Burrow Ambush', cost: 20, type: 'Passive', description: "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends." },
+        { name: 'Glial Reconstitution', cost: 20, type: 'Active (1 Biomass)', description: 'This Unit gains BUFF SPEED (1), or BUFF SPEED (2) if the Unit is ON CREEP.' }
+      ],
+      'Assault Phase': [{ name: 'Hydriodic Bile', cost: 10, type: 'Passive', description: "This Unit's Acid Saliva weapon gains Surge Type: Light, and S Dice: D3+1.", modifies: { weapon: 'Acid Saliva', changes: { surge: 'Light', sDie: 'D3+1' } } }]
+    }
+  },
+  { id: 'vile', name: 'Vile (Roach)', role: 'Core', tags: ['Armoured', 'Biological', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '5+', armour: '3+', hp: 4, size: 2 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 200, models: '2-3', supply: 1 }, { tier: 'T1', cost: null, models: '1', supply: 0 }],
+    weapons: [
+      { name: 'Acid Saliva', phase: 'Assault', range: '8', target: 'Ground', roa: 4, hit: '3+', surge: '-', sDie: '-', damage: 1, keywords: [] },
+      { name: 'Vile Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+    ],
+    abilities: [
+      { phase: 'Any Phase', name: 'Debilitating Saliva', type: 'Reaction (1 Biomass)', description: "Use when an Enemy Unit Within 8\" of this Unit declares a Ranged Attack. Apply DEBUFF Hit (1) to each of that Unit's Ranged Weapons." },
+      { phase: 'Any Phase', name: 'Burrow', type: 'Active (2 Biomass)', description: 'If this Unit is Unengaged, it gains or loses the Burrowed Status.' }
+    ],
+    phaseAbilities: {
+      'Assault Phase': [
+        { name: 'Regeneration', type: 'Passive', description: 'When this Unit becomes Activated, if it has the Burrowed Status, resolve the HEAL (2) effect.' },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (1) 4+ effect.' }
+      ]
+    },
+    upgrades: {
+      'Any Phase': [{ name: 'Tunneling Claws', cost: 10, type: 'Passive', description: "While this Unit has the Burrowed Status, it may perform the Move and Run actions without losing that Status. It may also move through other Units' bases." }],
+      'Movement Phase': [
+        { name: 'Burrow Ambush', cost: 20, type: 'Passive', description: "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends." },
+        { name: 'Glial Reconstitution', cost: 20, type: 'Active (1 Biomass)', description: 'This Unit gains BUFF SPEED (1), or BUFF SPEED (2) if the Unit is ON CREEP.' }
+      ],
+      'Assault Phase': [{ name: 'Hydriodic Bile', cost: 10, type: 'Passive', description: "This Unit's Acid Saliva weapon gains Surge Type: Light, and S Dice: D3+1.", modifies: { weapon: 'Acid Saliva', changes: { surge: 'Light', sDie: 'D3+1' } } }]
+    }
+  },
+  { id: 'zergling', name: 'Zergling', role: 'Core', tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '4/8', evade: '4+', armour: '6+', hp: 1, size: 1 },
+    tiers: [{ tier: 'T3', cost: 220, models: '13-18', supply: 2 }, { tier: 'T2', cost: 180, models: '7-12', supply: 1 }, { tier: 'T1', cost: null, models: '1-6', supply: 0 }],
+    weapons: [{ name: 'Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: 'Light', sDie: 'D3', damage: 1, keywords: [] }],
+    abilities: [{ phase: 'Any Phase', name: 'Squadron', type: 'Passive', description: "This Unit's Horizontal Coherency is 4\"." }],
+    phaseAbilities: {
+      'Assault Phase': [
+        { name: 'Metabolic Boost', type: 'Active (1 Biomass)', description: "When determining Charge Distance for this Unit, roll 2D6 instead of D6 and use the higher result to add to the Unit's Speed characteristic." },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (1) 5+ effect.' }
+      ]
+    },
+    upgrades: {
+      'Movement Phase': [{ name: 'Burrow Ambush', cost: '20/30', type: 'Passive', description: "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends." }],
+      'Combat Phase': [
+        { name: 'Shredding Claws', cost: 20, type: 'Weapon', description: 'Replaces Claws. Surge: Light, Armoured.', modifies: { weapon: 'Claws', changes: { surge: 'Light, Armoured' } } },
+        { name: 'Adrenal Glands', cost: 30, type: 'Passive', description: "This Unit's Claws and Shredding Claws weapons gain PRECISION (2)." }
+      ]
+    }
+  },
+  { id: 'swarmling', name: 'Swarmling (Zergling)', role: 'Core', tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '4/8', evade: '5+', armour: '6+', hp: 1, size: 1 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 270, models: '7-18', supply: 1 }, { tier: 'T1', cost: null, models: '1-6', supply: 0 }],
+    weapons: [{ name: 'Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '5+', surge: '-', sDie: '-', damage: 1, keywords: [] }],
+    abilities: [{ phase: 'Any Phase', name: 'Squadron', type: 'Passive', description: "This Unit's Horizontal Coherency is 4\"." }],
+    phaseAbilities: {
+      'Movement Phase': [{ name: 'Zergling Reconstitution', type: 'Active (1 Biomass)', description: 'Resolve the RESPAWN (2) effect, or RESPAWN (3) if the Unit is ON CREEP.' }],
+      'Assault Phase': [
+        { name: 'Metabolic Boost', type: 'Active (1 Biomass)', description: "When determining Charge Distance for this Unit, roll 2D6 instead of D6 and use the higher result to add to the Unit's Speed characteristic." },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (1) 5+ effect.' }
+      ]
+    },
+    upgrades: {
+      'Movement Phase': [{ name: 'Burrow Ambush', cost: 20, type: 'Passive', description: "When this Unit is nominated to deploy from the Reserves, it may resolve the PLACE (18) effect from the controlling player's Entry Edge. No model may be set Within 10\" of any Enemy model. This Unit's Activation ends." }]
+    }
+  },
+
+  // SUPPORT
+  { id: 'queen', name: 'Queen', role: 'Support', tags: ['Armoured', 'Biological', 'Psionic', 'Ground'],
+    stats: { shield: null, speed: '4', evade: '-', armour: '4+', hp: 9, size: 3 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 150, models: '1', supply: 1 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
+    weapons: [
+      { name: 'Talons', phase: 'Assault', range: '6', target: 'Ground', roa: 4, hit: '4+', surge: 'Light', sDie: 'D3', damage: 2, keywords: [] },
+      { name: 'Acid Spines', phase: 'Assault', range: '12', target: 'Flying', roa: 4, hit: '4+', surge: 'Light, Armoured', sDie: 'D3', damage: 2, keywords: [] },
+      { name: 'Talons', phase: 'Combat', range: 'E', target: 'Ground', roa: 3, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+    ],
+    abilities: [
+      { phase: 'Any Phase', name: 'Spawn Creep Tumor', type: 'Active (1 Biomass)', description: 'Set a Creep Tumor token in base-to-base contact with this Unit.' },
+      { phase: 'Any Phase', name: 'Transfusion', type: 'Reaction (1 Biomass)', description: 'Use when another Friendly Biological Unit (including a Structure) suffers Damage Within 4". Reduce the Total Damage before allocation by 2.' },
+      { phase: 'Any Phase', name: 'Restoration', type: 'Reaction (1 Biomass)', description: 'Use when a Friendly Unit Within 4" receives a DEBUFF. Remove all DEBUFFS from it.' },
+      { phase: 'Any Phase', name: 'Psionic Link', type: 'Passive', description: 'Once per Round, if there are at least 7 Friendly models Within 6" of this Unit, it may resolve its Special Ability with the BM cost reduced by 1.' }
+    ],
+    phaseAbilities: {
+      'Assault Phase': [{ name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (4) 3+ effect.' }]
+    },
+    upgrades: {
+      'Any Phase': [{ name: 'Creep Speed', cost: 10, type: 'Passive', description: "While this Unit is ON CREEP, increase this Unit's Speed characteristic by 2." }],
+      'Movement Phase': [{ name: 'Domineering Presence', cost: 10, type: 'Active (1 Biomass)', description: "Select another Friendly Unit Within 6\" (Line of Sight is not required). That Unit's Supply characteristic is increased by 1 for Controlling and Contesting Mission Markers and completing objectives." }]
+    }
+  },
+
+  // OTHER
+  { id: 'omega-worm', name: 'Omega Worm', role: 'Other', factionTag: "Kerrigan's Swarm", tags: ['Armoured', 'Biological', 'Ground'],
+    stats: { shield: null, speed: '-', evade: '-', armour: '5+', hp: 10, size: 3 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 0, models: '1', supply: 0 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
+    weapons: [],
+    abilities: [
+      { phase: 'Any Phase', name: 'Detection', type: 'Passive', description: 'While Enemy Units are Within 6" of this Unit, they lose HIDDEN Status.' },
+      { phase: 'Any Phase', name: 'Source of Creep', type: 'Passive', description: 'A Friendly or Enemy Ground Zerg Unit Within 6" of this Unit, counts as being ON CREEP.' },
+      { phase: 'Any Phase', name: 'Structure', type: 'Passive', description: 'This Unit cannot be Activated in any Phase and cannot perform actions. Its Current Supply Value is treated as 0, and it can never Control or Contest Mission Markers. This Unit cannot be a target of an ability, unless stated otherwise.' },
+      { phase: 'Any Phase', name: 'Omega Network', type: 'Passive', description: 'The base of the Omega Worm counts as an Entry Edge. Each Round, Friendly Units with a combined Supply cost of 2 or less may be Deployed via this Entry Edge. If a Friendly Leading model finishes a Move, Disengage, or Run action in base-to-base contact with the Omega Worm, the controlling player may remove that Unit from the battlefield and return it to Reserves.' }
+    ],
+    phaseAbilities: {},
+    upgrades: {}
+  },
+  { id: 'roachling', name: 'Roachling', role: 'Other', tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '6+', armour: '6+', hp: 1, size: 1 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 0, models: '1-3', supply: 0 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
+    weapons: [{ name: 'Claws', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: [] }],
+    abilities: [{ phase: 'Any Phase', name: 'Underdeveloped Claws', type: 'Passive', description: 'This Unit cannot gain Burrowed Status.' }],
+    phaseAbilities: {},
+    upgrades: {}
+  },
+];
+
+// ============================================================================
+// DATA: Tactical Cards (11 total)
+// ============================================================================
+const ZERG_TACTICAL_CARDS = [
+  { id: 'accelerating-creep', name: 'Accelerating Creep', unique: true, cost: 0, resource: null, slots: {},
+    abilities: [
+      { phase: 'Any Phase', name: 'Speed on Creep', type: 'Passive', description: 'If the active Friendly Zerg Unit is ON CREEP, increase its Speed characteristic by 1.' },
+      { phase: 'Any Phase', name: 'Living Glob of Tissue', type: 'Passive', description: 'Creep Tumor tokens have STAY IN PLAY and DISPLACEMENT.' },
+      { phase: 'Any Phase', name: 'Creep Removal', type: 'Passive', description: 'If an Enemy Unit ends a Move, Deploy, Run, Charge or Disengage action Within 1" of a Friendly Creep Tumor token, remove that token from the battlefield.' }
+    ]
+  },
+  { id: 'evolution-chamber', name: 'Evolution Chamber', unique: false, cost: 30, resource: '+1 BM', slots: { core: 1 },
+    abilities: [
+      { phase: 'Any Phase', name: 'Carapace', type: 'Reaction', description: 'Use before a Friendly Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll.' },
+      { phase: 'Assault Phase', name: 'Extended Claws', type: 'Active', description: 'The active Unit gains a +1 Modifier to all IMPACT Hit Rolls.' }
+    ]
+  },
+  { id: 'hatchery', name: 'Hatchery', unique: false, cost: 30, resource: '+1 BM', slots: { support: 1 },
+    abilities: [
+      { phase: 'Movement Phase', name: 'Lie in Wait', type: 'Active', description: 'The active, Unengaged Ground Unit gains the Burrowed Status.' },
+      { phase: 'Movement Phase', name: 'Creep Spread', type: 'Active', description: 'Place a Creep Tumor token on the battlefield Within 6" (Line of Sight is not required) of either a Friendly Entry Edge or an existing Friendly Creep Tumor token.' }
+    ]
+  },
+  { id: 'hydralisk-den', name: 'Hydralisk Den', unique: false, cost: 35, resource: '+1 BM', slots: { elite: 2 },
+    abilities: [{ phase: 'Assault Phase', name: 'Missile Attacks', type: 'Active', description: "The active Unit's first Ranged Weapon used gains PRECISION (1)." }]
+  },
+  { id: 'lair', name: 'Lair', unique: true, cost: 35, resource: '+1 BM', slots: { elite: 1, core: 1 },
+    abilities: [
+      { phase: 'Any Phase', name: 'Predation', type: 'Active', description: "The active Unit's Close Combat Weapons gain INSTANT." },
+      { phase: 'Movement Phase', name: 'Creep Spread', type: 'Active', description: 'Place a Creep Tumor token on the battlefield Within 6" (Line of Sight is not required) of either a Friendly Entry Edge or an existing Friendly Creep Tumor token.' }
+    ]
+  },
+  { id: 'malignant-creep', name: 'Malignant Creep', unique: true, cost: 10, resource: null, slots: {},
+    abilities: [
+      { phase: 'Any Phase', name: 'Living Glob of Tissue', type: 'Passive', description: 'Creep Tumor tokens have STAY IN PLAY and DISPLACEMENT.' },
+      { phase: 'Any Phase', name: 'Creep Removal', type: 'Passive', description: 'If an Enemy Unit ends a Move, Deploy, Run, Charge or Disengage action Within 1" of a Friendly Creep Tumor token, remove that token from the battlefield.' },
+      { phase: 'Assault Phase', name: 'Malevolent Matriarch', type: 'Passive', description: 'If the active Friendly Zerg Unit declares a Charge action while ON CREEP, it gains +1 Modifier to IMPACT Hit Rolls.' }
+    ]
+  },
+  { id: 'overlord', name: 'Overlord', unique: true, cost: 45, resource: '+1 BM', slots: { hero: 1, elite: 1, core: 1 },
+    abilities: [
+      { phase: 'Movement Phase', name: 'Ventral Sacs', type: 'Active', description: 'Place a Faction Indicator anywhere on the battlefield more than 10" away from any Enemy model. At the End of the Round, the controlling player may Deploy one Ground Unit from Reserves in base-to-base contact with this Faction Indicator.' },
+      { phase: 'Assault Phase', name: 'Excrete Creep', type: 'Active', description: 'Place a Creep Tumor token on the battlefield Within 6" (Line of Sight is not required) of either a Friendly Entry Edge or an existing Friendly Creep Tumor token.' }
+    ]
+  },
+  { id: 'overseer', name: 'Overseer', unique: true, cost: 25, resource: '+1 BM', slots: { support: 1 },
+    abilities: [
+      { phase: 'Movement Phase', name: 'Oversight Mode', type: 'Active', description: 'Place a Faction Indicator anywhere on the battlefield. While Enemy Units are Within 6" of this Faction Indicator, they lose HIDDEN.' },
+      { phase: 'Assault Phase', name: 'Pneumatized Carapace', type: 'Reaction', description: 'Use after a Friendly Unit rolls a D6 for Charge Distance. Roll an additional D6 and use the higher result to calculate the total Charge Distance.' }
+    ]
+  },
+  { id: 'roach-warren', name: 'Roach Warren', unique: false, cost: 25, resource: '+1 BM', slots: { core: 1 },
+    abilities: [{ phase: 'Assault Phase', name: 'Nasty Surprise', type: 'Active', description: 'The active Ground Unit loses the Burrowed Status.' }]
+  },
+  { id: 'spawning-pool', name: 'Spawning Pool', unique: false, cost: 25, resource: '+1 BM', slots: { core: 1 },
+    abilities: [{ phase: 'Combat Phase', name: 'Feral Rage', type: 'Active', description: "The active Unit's first Close Combat Weapon used gains PRECISION (2)." }]
+  },
+  { id: 'spawning-pool-six', name: 'Spawning Pool (Six Pool)', unique: true, cost: 40, resource: '+2 BM', slots: { core: 2 },
+    abilities: [
+      { phase: 'Movement Phase', name: 'Timing Push', type: 'Active', description: "The active Zergling Unit Deploys from any table edge that is not a Player's Entry Edge. This action must end more than 10\" away from any Enemy model." },
+      { phase: 'Combat Phase', name: 'Feral Rage', type: 'Active', description: "The active Unit's first Close Combat Weapon used gains PRECISION (2)." }
+    ]
+  },
+];
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+const highlightKeywords = (text, onClick) => {
+  const patterns = Object.keys(KEYWORDS).map(k => ({ keyword: k, pattern: new RegExp(`\\b${k.replace(/[()]/g, '\\$&')}(?:\\s*\\([^)]+\\))?`, 'gi') }));
+  let result = text;
+  const matches = [];
+  patterns.forEach(({ keyword, pattern }) => {
+    let m; while ((m = pattern.exec(text)) !== null) matches.push({ start: m.index, end: m.index + m[0].length, text: m[0], keyword });
+  });
+  matches.sort((a, b) => a.start - b.start);
+  const filtered = []; let lastEnd = -1;
+  for (const r of matches) { if (r.start >= lastEnd) { filtered.push(r); lastEnd = r.end; } }
+  if (filtered.length === 0) return text;
+  const parts = []; let pos = 0;
+  filtered.forEach(r => {
+    if (r.start > pos) parts.push(text.slice(pos, r.start));
+    parts.push(<span key={r.start} className="keyword" onClick={(e) => { e.stopPropagation(); onClick(r.keyword); }}>{r.text}</span>);
+    pos = r.end;
+  });
+  if (pos < text.length) parts.push(text.slice(pos));
+  return parts;
+};
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+const Collapsible = ({ children, header, defaultOpen = false, className = '' }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (<div className={`${className} ${open ? 'open' : ''}`}><div onClick={() => setOpen(!open)}>{header}</div>{open && children}</div>);
+};
+
+const StatChip = ({ abbr, value }) => (<div className="stat-chip"><span className="stat-abbr">{abbr}</span><span className="stat-value">{value ?? '—'}</span></div>);
+
+const WeaponCard = ({ weapon, onKeywordClick, modifications }) => {
+  const w = modifications ? { ...weapon, ...modifications } : weapon;
+  return (
+    <div className="weapon-table">
+      <div className="weapon-table-header">
+        <span className="weapon-table-name">{w.name}</span>
+        <span className="weapon-table-phase">{w.phase}</span>
+      </div>
+      <div className="weapon-table-row">
+        <div className="weapon-table-cell"><span>RNG</span><strong>{w.range}</strong></div>
+        <div className="weapon-table-cell"><span>TGT</span><strong>{w.target}</strong></div>
+        <div className="weapon-table-cell"><span>RoA</span><strong>{w.roa}</strong></div>
+        <div className="weapon-table-cell"><span>Hit</span><strong>{w.hit}</strong></div>
+      </div>
+      <div className="weapon-table-row alt">
+        <div className="weapon-table-cell"><span>Surge</span><strong>{w.surge || '—'}</strong></div>
+        <div className="weapon-table-cell"><span>S.Die</span><strong>{w.sDie || '—'}</strong></div>
+        <div className="weapon-table-cell"><span>Dmg</span><strong>{w.damage}</strong></div>
+        <div className="weapon-table-cell"><span>Kwd</span><strong>{w.keywords?.length > 0 ? '✓' : '—'}</strong></div>
+      </div>
+      {w.keywords?.length > 0 && <div className="weapon-table-keywords">{w.keywords.map((kw, i) => <span key={i} className="keyword" onClick={() => onKeywordClick(kw.split('(')[0].trim())}>{kw}</span>)}</div>}
+    </div>
+  );
+};
+
+const Ability = ({ ability, onKeywordClick }) => (
+  <div className="ability open">
+    <div className="ability-header-static">
+      <div><div className="ability-title">{ability.name}</div><div className="ability-meta">{ability.type}</div></div>
+    </div>
+    <div className="ability-body">{highlightKeywords(ability.description, onKeywordClick)}</div>
+  </div>
+);
+
+const UnitCard = ({ unit, onAddToArmy, onKeywordClick, isInArmy }) => {
+  const [open, setOpen] = useState(false);
+  const allAbilities = [...(unit.abilities || []), ...Object.entries(unit.phaseAbilities || {}).flatMap(([phase, abs]) => abs.map(a => ({ ...a, phase })))];
+  const allUpgrades = Object.entries(unit.upgrades || {}).flatMap(([phase, upgs]) => upgs.map(u => ({ ...u, phase })));
+  const roleClass = `role-${unit.role.toLowerCase()}`;
+  
+  const surgeTags = unit.tags.filter(t => SURGE_TAGS.includes(t));
+  const typeTags = unit.tags.filter(t => TYPE_TAGS.includes(t));
+  const otherTags = unit.tags.filter(t => !SURGE_TAGS.includes(t) && !TYPE_TAGS.includes(t) && t !== 'Unique' && t !== 'Psionic');
+  const hasPsionic = unit.tags.includes('Psionic');
+  
+  return (
+    <div className={`unit-card ${roleClass} ${isInArmy ? 'in-army' : ''}`}>
+      <div className="unit-header" onClick={() => setOpen(!open)}>
+        <div className="unit-title-row">
+          <div className="unit-name">{unit.name} {unit.unique && <span className="unique-badge" onClick={(e) => { e.stopPropagation(); onKeywordClick('Unique'); }}>Unique</span>} {hasPsionic && <span className="psionic-badge" onClick={(e) => { e.stopPropagation(); onKeywordClick('Psionic'); }}>Psionic</span>}</div>
+          <button className="plus-btn" onClick={(e) => { e.stopPropagation(); onAddToArmy(unit); }}>+</button>
+        </div>
+        <div className="tag-row categorized">
+          {surgeTags.length > 0 && (
+            <span className="tag-group">
+              <span className="tag-label">Surge:</span>
+              {surgeTags.map(tag => <span key={tag} className="tag clickable" onClick={(e) => { e.stopPropagation(); onKeywordClick(tag); }}>{tag}</span>)}
+            </span>
+          )}
+          {surgeTags.length > 0 && typeTags.length > 0 && <span className="tag-separator">·</span>}
+          {typeTags.length > 0 && (
+            <span className="tag-group">
+              <span className="tag-label">Type:</span>
+              {typeTags.map(tag => <span key={tag} className="tag clickable type-tag" onClick={(e) => { e.stopPropagation(); onKeywordClick(tag); }}>{tag}</span>)}
+            </span>
+          )}
+          {otherTags.length > 0 && (surgeTags.length > 0 || typeTags.length > 0) && <span className="tag-separator">·</span>}
+          {otherTags.map(tag => <span key={tag} className="tag clickable" onClick={(e) => { e.stopPropagation(); onKeywordClick(tag); }}>{tag}</span>)}
+        </div>
+      </div>
+      {open && (
+        <div className="unit-body">
+          <div className="stats-grid" style={{ marginBottom: 12 }}>
+            <StatChip abbr="SH" value={unit.stats.shield} /><StatChip abbr="SP" value={unit.stats.speed} /><StatChip abbr="EV" value={unit.stats.evade} />
+            <StatChip abbr="AR" value={unit.stats.armour} /><StatChip abbr="HP" value={unit.stats.hp} /><StatChip abbr="SZ" value={unit.stats.size} />
+          </div>
+          <table className="tier-table"><thead><tr><th>Tier</th><th>Cost</th><th>Models</th><th>Supply</th></tr></thead>
+            <tbody>{unit.tiers.map(t => <tr key={t.tier}><td>{t.tier}</td><td>{t.cost ?? '—'}</td><td>{t.models}</td><td>{t.supply}</td></tr>)}</tbody></table>
+          {unit.weapons.length > 0 && <Collapsible className="section-block" header={<div className="section-header"><span className="section-title">Weapons</span><span className="chevron">›</span></div>}><div className="section-body">{unit.weapons.map((w, i) => <WeaponCard key={i} weapon={w} onKeywordClick={onKeywordClick} />)}</div></Collapsible>}
+          {allAbilities.length > 0 && <Collapsible className="section-block" header={<div className="section-header"><span className="section-title">Abilities</span><span className="chevron">›</span></div>}><div className="section-body">{allAbilities.map((a, i) => <Ability key={i} ability={{ ...a, type: `${a.phase} · ${a.type}` }} onKeywordClick={onKeywordClick} />)}</div></Collapsible>}
+          {allUpgrades.length > 0 && <Collapsible className="section-block" header={<div className="section-header"><span className="section-title">Upgrades</span><span className="chevron">›</span></div>}><div className="section-body">{allUpgrades.map((u, i) => <Ability key={i} ability={{ name: u.name, type: `${u.phase} · ${u.cost} pts · ${u.type}`, description: u.description }} onKeywordClick={onKeywordClick} />)}</div></Collapsible>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TacticalCard = ({ card, onKeywordClick, onAddToArmy, isInArmy }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`tactical-card ${isInArmy ? 'in-army' : ''}`}>
+      <div className="tactical-header" onClick={() => setOpen(!open)}>
+        <div className="tactical-title-row">
+          <div>
+            <div className="tactical-name">{card.name} {card.unique && <span className="unique-badge">Unique</span>}</div>
+          </div>
+          <div className="tactical-right">
+            <span className="tactical-cost">{card.cost} Gas</span>
+            <button className="plus-btn small" onClick={(e) => { e.stopPropagation(); onAddToArmy(card); }}>+</button>
+          </div>
+        </div>
+        <div className="tactical-info">{card.resource && <span className="tactical-pill">{card.resource}</span>}{Object.entries(card.slots).map(([slot, count]) => <span key={slot} className="tactical-pill">{slot.toUpperCase()} +{count}</span>)}</div>
+      </div>
+      {open && <div className="tactical-body">
+        {card.abilities.map((a, i) => <Ability key={i} ability={{ ...a, type: `${a.phase} · ${a.type}` }} onKeywordClick={onKeywordClick} />)}
+      </div>}
+    </div>
+  );
+};
+
+const KeywordModal = ({ keyword, onClose }) => {
+  const data = KEYWORDS[keyword] || TAGS[keyword]; if (!data) return null;
+  return (<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()}><div className="modal-header"><div><div className="modal-title">{keyword}</div><div className="modal-type">{data.type}</div></div><button className="modal-close" onClick={onClose}>×</button></div><div className="modal-body">{data.description}</div></div></div>);
+};
+
+const TierPickerModal = ({ unit, onSelect, onClose }) => {
+  const purchasableTiers = unit.tiers.filter(t => t.cost !== null && t.models !== '-');
+  return (<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()}><div className="modal-header"><div><div className="modal-title">Add {unit.name}</div><div className="modal-type">Select composition</div></div><button className="modal-close" onClick={onClose}>×</button></div><div className="modal-body">{purchasableTiers.length === 0 ? <div className="empty-state"><div className="empty-state-text">This unit cannot be purchased directly</div></div> : purchasableTiers.map(tier => <div key={tier.tier} className="tier-option" onClick={() => onSelect(unit, tier)}><div className="tier-option-main"><span className="tier-option-models">{tier.models} models</span><span className="tier-option-cost">{tier.cost} pts</span></div><div className="tier-option-supply">Supply: {tier.supply} · {tier.tier}</div></div>)}</div></div></div>);
+};
+
+// Army Unit Card
+const ArmyUnitCard = ({ entry, onRemove, onToggleUpgrade, onKeywordClick }) => {
+  const [open, setOpen] = useState(false);
+  const { unit, tier, selectedUpgrades } = entry;
+  const totalCost = entry.cost + selectedUpgrades.reduce((sum, upg) => { const cost = upg.cost; if (typeof cost === 'string' && cost.includes('/')) { const [single] = cost.split('/').map(Number); return sum + single; } return sum + (parseInt(cost) || 0); }, 0);
+  const allUpgrades = Object.entries(unit.upgrades || {}).flatMap(([phase, upgs]) => upgs.map(u => ({ ...u, phase })));
+  const weaponMods = {}; selectedUpgrades.forEach(upg => { if (upg.modifies) weaponMods[upg.modifies.weapon] = upg.modifies.changes || upg.modifies; });
+  const roleClass = `role-${unit.role.toLowerCase()}`;
+  
+  const surgeTags = unit.tags.filter(t => SURGE_TAGS.includes(t));
+  const typeTags = unit.tags.filter(t => TYPE_TAGS.includes(t));
+  const hasPsionic = unit.tags.includes('Psionic');
+  
+  return (
+    <div className={`army-unit ${roleClass}`}>
+      <div className="army-unit-header" onClick={() => setOpen(!open)}>
+        <div>
+          <div className="army-unit-name">{unit.name}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{tier.models} models · Supply {tier.supply}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="army-unit-cost">{totalCost} pts</div>
+          <span className="chevron">›</span>
+        </div>
+      </div>
+      {open && (
+        <div className="army-unit-body">
+          <div className="army-unit-tags">
+            {surgeTags.length > 0 && <span>Surge: {surgeTags.join(', ')}</span>}
+            {surgeTags.length > 0 && typeTags.length > 0 && <span className="tag-separator">·</span>}
+            {typeTags.length > 0 && <span>Type: {typeTags.join(', ')}</span>}
+            {(surgeTags.length > 0 || typeTags.length > 0) && (unit.unique || hasPsionic) && <span className="tag-separator">·</span>}
+            {unit.unique && <span>Unique</span>}
+            {unit.unique && hasPsionic && <span className="tag-separator">·</span>}
+            {hasPsionic && <span>Psionic</span>}
+          </div>
+          <div className="stats-grid" style={{ marginBottom: 12 }}><StatChip abbr="SH" value={unit.stats.shield} /><StatChip abbr="SP" value={unit.stats.speed} /><StatChip abbr="EV" value={unit.stats.evade} /><StatChip abbr="AR" value={unit.stats.armour} /><StatChip abbr="HP" value={unit.stats.hp} /><StatChip abbr="SZ" value={unit.stats.size} /></div>
+          {unit.weapons.length > 0 && <Collapsible className="section-block" defaultOpen header={<div className="section-header"><span className="section-title">Weapons</span><span className="chevron">›</span></div>}><div className="section-body">{unit.weapons.map((w, i) => <WeaponCard key={i} weapon={w} modifications={weaponMods[w.name]} onKeywordClick={onKeywordClick} />)}</div></Collapsible>}
+          {selectedUpgrades.length > 0 && <div className="section-block open"><div className="section-header-static"><span className="section-title">Selected Upgrades</span></div><div className="section-body">{selectedUpgrades.map((upg, i) => <Ability key={i} ability={{ name: upg.name, type: `${upg.phase} · ${upg.cost} pts · ${upg.type}`, description: upg.description }} onKeywordClick={onKeywordClick} />)}</div></div>}
+          {allUpgrades.length > 0 && <Collapsible className="section-block" header={<div className="section-header"><span className="section-title">Available Upgrades</span><span className="chevron">›</span></div>}><div className="section-body">{allUpgrades.map((upg, i) => { const isSelected = selectedUpgrades.some(s => s.name === upg.name); return (
+            <div key={i} className={`army-upgrade-card ${isSelected ? 'selected' : ''}`}>
+              <div className="army-upgrade-header">
+                <div>
+                  <div className="army-upgrade-name">{upg.name}</div>
+                  <div className="army-upgrade-meta">{upg.phase} · {upg.cost} pts · {upg.type}</div>
+                </div>
+                <button className={`upgrade-toggle ${isSelected ? 'active' : ''}`} onClick={() => onToggleUpgrade(upg)} />
+              </div>
+              <div className="army-upgrade-desc">{highlightKeywords(upg.description, onKeywordClick)}</div>
+            </div>
+          ); })}</div></Collapsible>}
+          <button className="remove-unit" onClick={onRemove}>Remove Unit</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Army Tactical Card
+const ArmyTacticalCard = ({ card, onRemove, onKeywordClick }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`army-tactical-card ${open ? 'open' : ''}`}>
+      <div className="army-tactical-header" onClick={() => setOpen(!open)}>
+        <div>
+          <div className="army-tactical-name">{card.name}</div>
+          <div className="army-tactical-meta">{card.resource || 'Creep Card'} · {Object.entries(card.slots).map(([s, c]) => `${s.toUpperCase()} +${c}`).join(', ') || 'No slots'}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="army-tactical-cost">{card.cost} Gas</span>
+          <span className="chevron">›</span>
+        </div>
+      </div>
+      {open && (
+        <div className="army-tactical-body">
+          {card.abilities.map((a, i) => <Ability key={i} ability={{ ...a, type: `${a.phase} · ${a.type}` }} onKeywordClick={onKeywordClick} />)}
+          <button className="remove-unit" onClick={onRemove}>Remove Card</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// MAIN APP
+// ============================================================================
+export default function App() {
+  const [selectedFaction, setSelectedFaction] = useState(ZERG_FACTION_CARDS[0]);
+  const [selectedScale, setSelectedScale] = useState(ENGAGEMENT_SCALES[1]);
+  const [armyUnits, setArmyUnits] = useState([]);
+  const [armyTactical, setArmyTactical] = useState([]);
+  const [keywordModal, setKeywordModal] = useState(null);
+  const [tierPicker, setTierPicker] = useState(null);
+  const [headerOpen, setHeaderOpen] = useState(true);
+
+  // Calculate totals
+  const minerals = armyUnits.reduce((sum, u) => sum + u.cost + u.selectedUpgrades.reduce((us, upg) => { const cost = upg.cost; if (typeof cost === 'string' && cost.includes('/')) { const [single] = cost.split('/').map(Number); return us + single; } return us + (parseInt(cost) || 0); }, 0), 0);
+  const gas = armyTactical.reduce((sum, t) => sum + t.cost, 0);
+  const supply = armyUnits.reduce((sum, u) => sum + u.tier.supply, 0);
+  
+  const mineralsRemaining = selectedScale.id === 'grand' ? '∞' : selectedScale.minerals - minerals;
+  const gasRemaining = selectedScale.id === 'grand' ? '∞' : selectedScale.gas - gas;
+  const mineralsOver = typeof mineralsRemaining === 'number' && mineralsRemaining < 0;
+  const gasOver = typeof gasRemaining === 'number' && gasRemaining < 0;
+
+  // Calculate slots from faction + tactical
+  const baseSlots = selectedFaction?.slots || {};
+  const tacticalSlots = armyTactical.reduce((acc, t) => {
+    Object.entries(t.slots).forEach(([slot, count]) => {
+      acc[slot] = (acc[slot] || 0) + count;
+    });
+    return acc;
+  }, {});
+  const totalSlots = { ...baseSlots };
+  Object.entries(tacticalSlots).forEach(([slot, count]) => {
+    totalSlots[slot] = (totalSlots[slot] || 0) + count;
+  });
+  
+  const slotsUsed = { hero: 0, elite: 0, core: 0, support: 0 };
+  armyUnits.forEach(u => {
+    const role = u.unit.role.toLowerCase();
+    if (slotsUsed[role] !== undefined) slotsUsed[role] += u.tier.supply || 1;
+  });
+
+  // Persistence
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sc-tmg-zerg-v3');
+      if (saved) {
+        const { units, tactical, factionId, scaleId } = JSON.parse(saved);
+        const rehydratedUnits = (units || []).map(entry => {
+          const unit = ZERG_UNITS.find(u => u.id === entry.unitId);
+          if (!unit) return null;
+          return { unit, tier: entry.tier, cost: entry.cost, selectedUpgrades: entry.selectedUpgrades || [] };
+        }).filter(Boolean);
+        const rehydratedTactical = (tactical || []).map(id => ZERG_TACTICAL_CARDS.find(t => t.id === id)).filter(Boolean);
+        setArmyUnits(rehydratedUnits);
+        setArmyTactical(rehydratedTactical);
+        const faction = ZERG_FACTION_CARDS.find(f => f.id === factionId);
+        if (faction) setSelectedFaction(faction);
+        const scale = ENGAGEMENT_SCALES.find(s => s.id === scaleId);
+        if (scale) setSelectedScale(scale);
+      }
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useEffect(() => {
+    const toSave = {
+      units: armyUnits.map(entry => ({ unitId: entry.unit.id, tier: entry.tier, cost: entry.cost, selectedUpgrades: entry.selectedUpgrades })),
+      tactical: armyTactical.map(t => t.id),
+      factionId: selectedFaction?.id,
+      scaleId: selectedScale?.id
+    };
+    localStorage.setItem('sc-tmg-zerg-v3', JSON.stringify(toSave));
+  }, [armyUnits, armyTactical, selectedFaction, selectedScale]);
+
+  const handleAddUnit = useCallback((unit) => setTierPicker(unit), []);
+  const handleSelectTier = useCallback((unit, tier) => { setArmyUnits(prev => [...prev, { unit, tier, cost: tier.cost, selectedUpgrades: [] }]); setTierPicker(null); }, []);
+  const handleRemoveUnit = useCallback((idx) => setArmyUnits(prev => prev.filter((_, i) => i !== idx)), []);
+  const handleToggleUpgrade = useCallback((unitIdx, upgrade) => { setArmyUnits(prev => prev.map((entry, i) => { if (i !== unitIdx) return entry; const isSelected = entry.selectedUpgrades.some(u => u.name === upgrade.name); return { ...entry, selectedUpgrades: isSelected ? entry.selectedUpgrades.filter(u => u.name !== upgrade.name) : [...entry.selectedUpgrades, upgrade] }; })); }, []);
+  
+  const handleAddTactical = useCallback((card) => {
+    if (card.unique && armyTactical.some(t => t.id === card.id)) return;
+    setArmyTactical(prev => [...prev, card]);
+  }, [armyTactical]);
+  const handleRemoveTactical = useCallback((idx) => setArmyTactical(prev => prev.filter((_, i) => i !== idx)), []);
+  
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [exportText, setExportText] = useState(null);
+  
+  const handleClearArmy = useCallback(() => { setArmyUnits([]); setArmyTactical([]); setShowClearConfirm(false); }, []);
+  const handleExport = useCallback(() => {
+    const lines = [`=== ${selectedFaction?.name || 'Zerg'} Army ===`, `${selectedScale.name}`, ''];
+    
+    // Calculate warnings
+    const warnings = [];
+    if (selectedScale.id !== 'grand') {
+      if (minerals > selectedScale.minerals) warnings.push(`⚠ MINERALS: ${minerals}/${selectedScale.minerals}`);
+      if (gas > selectedScale.gas) warnings.push(`⚠ GAS: ${gas}/${selectedScale.gas}`);
+    }
+    const currentSlotsUsed = { hero: 0, elite: 0, core: 0, support: 0 };
+    armyUnits.forEach(u => {
+      const role = u.unit.role.toLowerCase();
+      if (currentSlotsUsed[role] !== undefined) currentSlotsUsed[role] += u.tier.supply || 1;
+    });
+    const currentTotalSlots = { ...(selectedFaction?.slots || {}) };
+    armyTactical.forEach(t => {
+      Object.entries(t.slots).forEach(([slot, count]) => {
+        currentTotalSlots[slot] = (currentTotalSlots[slot] || 0) + count;
+      });
+    });
+    Object.entries(currentSlotsUsed).forEach(([slot, used]) => {
+      const available = currentTotalSlots[slot] || 0;
+      if (used > available) warnings.push(`⚠ ${slot.toUpperCase()}: ${used}/${available}`);
+    });
+    if (warnings.length > 0) {
+      lines.push(...warnings, '');
+    }
+    
+    // Tactical Cards
+    if (armyTactical.length > 0) {
+      lines.push('── TACTICAL CARDS ──', '');
+      armyTactical.forEach(t => {
+        lines.push(`▸ ${t.name}${t.unique ? ' [Unique]' : ''} - ${t.cost} Gas`);
+        if (t.resource) lines.push(`  Resource: ${t.resource}`);
+        if (Object.keys(t.slots).length > 0) {
+          lines.push(`  Slots: ${Object.entries(t.slots).map(([s, c]) => `${s.toUpperCase()} +${c}`).join(', ')}`);
+        }
+        t.abilities.forEach(a => {
+          lines.push(`  • ${a.name} (${a.phase} · ${a.type})`);
+          lines.push(`    ${a.description}`);
+        });
+        lines.push('');
+      });
+    }
+    
+    // Units
+    if (armyUnits.length > 0) {
+      lines.push('── UNITS ──', '');
+      armyUnits.forEach(entry => {
+        const { unit, tier, selectedUpgrades } = entry;
+        const upgCost = selectedUpgrades.reduce((sum, u) => { const cost = typeof u.cost === 'string' ? parseInt(u.cost.split('/')[0]) : u.cost; return sum + (cost || 0); }, 0);
+        const unitTotal = entry.cost + upgCost;
+        
+        lines.push(`▸ ${unit.name}${unit.unique ? ' [Unique]' : ''} - ${unitTotal} pts`);
+        lines.push(`  ${tier.models} models · Supply ${tier.supply} · ${unit.role}`);
+        lines.push(`  Tags: ${unit.tags.join(', ')}`);
+        
+        // Stats
+        const stats = unit.stats;
+        lines.push(`  Stats: SH ${stats.shield ?? '—'} | SP ${stats.speed} | EV ${stats.evade ?? '—'} | AR ${stats.armour} | HP ${stats.hp} | SZ ${stats.size}`);
+        
+        // Weapons
+        if (unit.weapons.length > 0) {
+          lines.push('  Weapons:');
+          unit.weapons.forEach(w => {
+            lines.push(`    • ${w.name} (${w.phase})`);
+            lines.push(`      RNG ${w.range} | TGT ${w.target} | RoA ${w.roa} | Hit ${w.hit} | Surge ${w.surge || '—'} | S.Die ${w.sDie || '—'} | Dmg ${w.damage}`);
+            if (w.keywords?.length > 0) lines.push(`      Keywords: ${w.keywords.join(', ')}`);
+          });
+        }
+        
+        // Abilities
+        const allAbilities = [...(unit.abilities || []), ...Object.entries(unit.phaseAbilities || {}).flatMap(([phase, abs]) => abs.map(a => ({ ...a, phase })))];
+        if (allAbilities.length > 0) {
+          lines.push('  Abilities:');
+          allAbilities.forEach(a => {
+            lines.push(`    • ${a.name} (${a.phase} · ${a.type})`);
+            lines.push(`      ${a.description}`);
+          });
+        }
+        
+        // Selected Upgrades
+        if (selectedUpgrades.length > 0) {
+          lines.push('  Selected Upgrades:');
+          selectedUpgrades.forEach(u => {
+            lines.push(`    ✓ ${u.name} (${u.phase} · ${u.cost} pts · ${u.type})`);
+            lines.push(`      ${u.description}`);
+          });
+        }
+        
+        lines.push('');
+      });
+    }
+    
+    // Summary
+    lines.push('── SUMMARY ──');
+    lines.push(`Spent: ${minerals} Minerals | ${gas} Gas`);
+    if (selectedScale.id !== 'grand') {
+      lines.push(`Remaining: ${mineralsRemaining} Minerals | ${gasRemaining} Gas`);
+    }
+    lines.push(`Total Supply: ${supply}`);
+    
+    setExportText(lines.join('\n'));
+  }, [armyUnits, armyTactical, selectedFaction, selectedScale, minerals, gas, mineralsRemaining, gasRemaining, supply]);
+
+  const unitIdsInArmy = armyUnits.map(u => u.unit.id);
+  const tacticalIdsInArmy = armyTactical.map(t => t.id);
+
+  return (
+    <div className="app">
+      <a href="index.html" className="home-btn" title="Home">←</a>
+      <style>{`
+        :root { --bg:#1a1a1a; --panel:#242424; --panel-2:#2a2a2a; --panel-3:#303030; --text:#f0eee8; --muted:#a8a299; --border:#3a3a3a; --accent:#8b5cf6; --zerg-accent:#9333ea; --success:#22c55e; --warning:#eab308; --error:#ef4444; --gas:#22d3ee; --radius:16px; --radius-sm:10px; --role-hero:#f59e0b; --role-elite:#a855f7; --role-core:#3b82f6; --role-support:#22c55e; --role-other:#6b7280; --tactical:#06b6d4; --glossary:#ec4899; }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { background:var(--bg); color:var(--text); font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; }
+        .app { max-width:480px; margin:0 auto; min-height:100vh; padding:12px; }
+        
+        /* Faction & Scale Selector */
+        .selector-group { }
+        .faction-label { font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px; }
+        .faction-options { display:flex; gap:8px; }
+        .faction-option { flex:1; padding:10px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--panel-2); color:var(--muted); font-size:0.85rem; font-weight:600; cursor:pointer; text-align:center; transition:all 0.15s; }
+        .faction-option.active { border-color:var(--zerg-accent); color:var(--text); background:rgba(147,51,234,0.1); }
+        .scale-options { display:flex; gap:6px; }
+        .scale-option { flex:1; padding:8px 6px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--panel-2); color:var(--muted); font-size:0.75rem; font-weight:600; cursor:pointer; text-align:center; transition:all 0.15s; display:flex; flex-direction:column; gap:2px; }
+        .scale-option.active { border-color:var(--accent); color:var(--text); background:rgba(139,92,246,0.1); }
+        .scale-name { font-size:0.8rem; }
+        .scale-limits { font-size:0.65rem; color:var(--muted); }
+
+        /* Army Header */
+        .army-header { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; position:sticky; top:0; z-index:50; }
+        .army-header-top { display:flex; align-items:center; gap:8px; padding:12px 16px; cursor:pointer; user-select:none; }
+        .army-header .army-title { font-size:1rem; font-weight:700; flex:1; }
+        .army-header-summary { display:flex; gap:10px; font-size:0.8rem; }
+        .army-header-summary span { padding:2px 8px; border-radius:6px; background:rgba(255,255,255,0.05); }
+        .army-header-summary .minerals { color:var(--warning); }
+        .army-header-summary .gas { color:var(--gas); }
+        .army-header-summary .over { color:var(--error); }
+        .army-header .chevron { color:var(--muted); font-size:18px; transition:transform 0.2s; }
+        .army-header.open .chevron { transform:rotate(90deg); }
+        .army-header-body { padding:0 16px 12px; border-top:1px solid var(--border); }
+        
+        .army-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+        .army-stat { padding:10px 8px; background:var(--panel-2); border-radius:var(--radius-sm); text-align:center; }
+        .army-stat-label { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:2px; }
+        .army-stat-value { font-size:1.2rem; font-weight:700; font-variant-numeric:tabular-nums; }
+        .army-stat-value.over { color:var(--error); }
+        .army-stat-value.minerals { color:var(--warning); }
+        .army-stat-value.gas { color:var(--gas); }
+        
+        .army-slots { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+        .slot-badge { font-size:0.7rem; padding:3px 8px; border-radius:999px; font-weight:600; }
+        .slot-badge.ok { background:rgba(34,197,94,0.2); color:var(--success); }
+        .slot-badge.over { background:rgba(239,68,68,0.2); color:var(--error); }
+        
+        .army-actions { display:flex; gap:8px; margin-top:10px; }
+        .army-btn { flex:1; padding:10px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--panel-2); color:var(--text); font-size:0.8rem; font-weight:600; cursor:pointer; transition:all 0.15s; }
+        .army-btn:hover { background:var(--panel-3); }
+        .army-btn.danger:hover { background:rgba(239,68,68,0.2); border-color:var(--error); }
+
+        /* Army List Section */
+        .army-section { margin-bottom:4px; }
+        .army-section-title { font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px; padding-left:4px; }
+        
+        /* Library Divider */
+        .library-divider { display:flex; align-items:center; gap:12px; margin:16px 0; }
+        .library-divider-line { flex:1; height:1px; background:var(--border); }
+        .library-divider-text { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; font-weight:600; }
+        
+        .army-unit { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:8px; overflow:hidden; border-left:3px solid var(--border); }
+        .army-unit.role-hero { border-left-color:var(--role-hero); }
+        .army-unit.role-elite { border-left-color:var(--role-elite); }
+        .army-unit.role-core { border-left-color:var(--role-core); }
+        .army-unit.role-support { border-left-color:var(--role-support); }
+        .army-unit.role-other { border-left-color:var(--role-other); }
+        .army-unit-header { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer; }
+        .army-unit-name { font-weight:600; font-size:0.95rem; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+        .army-unit-tags { font-size:0.8rem; color:var(--muted); margin-bottom:12px; display:flex; align-items:center; gap:4px; }
+        .army-unit-cost { font-size:0.85rem; color:var(--warning); font-weight:600; }
+        .army-unit-body { padding:0 12px 12px; }
+        
+        .army-tactical-card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:8px; overflow:hidden; border-left:3px solid var(--tactical); }
+        .army-tactical-card.open .chevron { transform:rotate(90deg); }
+        .army-tactical-header { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer; }
+        .army-tactical-name { font-weight:600; font-size:0.95rem; }
+        .army-tactical-meta { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+        .army-tactical-cost { font-size:0.85rem; color:var(--gas); font-weight:600; }
+        .army-tactical-body { padding:0 12px 12px; }
+        .remove-btn { width:24px; height:24px; border-radius:6px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:16px; cursor:pointer; display:grid; place-items:center; }
+        .remove-btn:hover { background:rgba(239,68,68,0.2); border-color:var(--error); color:var(--error); }
+
+        /* Group Cards */
+        .group-card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; }
+        .group-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; cursor:pointer; user-select:none; }
+        .group-title { font-size:1.1rem; font-weight:700; }
+        .group-subtitle { font-size:0.8rem; color:var(--muted); margin-top:2px; }
+        .chevron { color:var(--muted); font-size:18px; transition:transform 0.2s; }
+        .group-card.open .chevron { transform:rotate(90deg); }
+        .group-body { padding:0 12px 12px; display:grid; gap:10px; }
+        
+        /* Role Groups */
+        .role-group { margin-bottom:8px; }
+        .role-group:last-child { margin-bottom:0; }
+        .role-group-header { display:flex; align-items:center; gap:8px; padding:8px 4px; margin-bottom:8px; }
+        .role-group-dot { width:8px; height:8px; border-radius:50%; }
+        .role-group-header.role-hero .role-group-dot { background:var(--role-hero); }
+        .role-group-header.role-elite .role-group-dot { background:var(--role-elite); }
+        .role-group-header.role-core .role-group-dot { background:var(--role-core); }
+        .role-group-header.role-support .role-group-dot { background:var(--role-support); }
+        .role-group-header.role-other .role-group-dot { background:var(--role-other); }
+        .role-group-name { font-size:0.8rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+        .role-group-count { font-size:0.7rem; color:var(--muted); opacity:0.7; }
+
+        /* Unit Card */
+        .unit-card { background:var(--panel-3); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; border-left:3px solid var(--border); }
+        .unit-card.role-hero { border-left-color:var(--role-hero); }
+        .unit-card.role-elite { border-left-color:var(--role-elite); }
+        .unit-card.role-core { border-left-color:var(--role-core); }
+        .unit-card.role-support { border-left-color:var(--role-support); }
+        .unit-card.role-other { border-left-color:var(--role-other); }
+        .unit-card.in-army { border-color:var(--success); border-left-width:3px; }
+        .unit-header { padding:14px; cursor:pointer; user-select:none; }
+        .unit-title-row { display:flex; justify-content:space-between; align-items:flex-start; }
+        .unit-name { font-size:1.1rem; font-weight:700; line-height:1.2; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .unique-badge { font-size:0.6rem; background:var(--zerg-accent); color:white; padding:2px 6px; border-radius:4px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; }
+        .psionic-badge { font-size:0.6rem; background:var(--accent); color:white; padding:2px 6px; border-radius:4px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; }
+        .plus-btn { width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:var(--text); font-size:20px; display:grid; place-items:center; cursor:pointer; transition:all 0.15s; flex-shrink:0; }
+        .plus-btn:hover { background:var(--accent); border-color:var(--accent); }
+        .plus-btn.small { width:26px; height:26px; font-size:16px; }
+        .tag-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center; }
+        .tag-row.categorized { gap:4px; }
+        .tag-group { display:flex; align-items:center; gap:4px; }
+        .tag-label { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.03em; margin-right:2px; }
+        .tag-separator { color:var(--muted); font-size:0.8rem; margin:0 4px; }
+        .tag { font-size:0.7rem; padding:3px 8px; border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,0.03); color:var(--muted); }
+        .tag.type-tag { background:rgba(139,92,246,0.1); border-color:rgba(139,92,246,0.3); color:var(--text); }
+        .tag.clickable { cursor:pointer; transition:all 0.15s; }
+        .tag.clickable:hover { background:rgba(139,92,246,0.15); border-color:var(--accent); color:var(--text); }
+        .stats-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+        .stat-chip { display:flex; align-items:center; justify-content:center; gap:6px; padding:10px 8px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); }
+        .stat-abbr { font-size:0.7rem; color:var(--muted); font-weight:600; }
+        .stat-value { font-size:1.15rem; font-weight:700; font-variant-numeric:tabular-nums; }
+        .unit-body { padding:0 12px 14px; }
+        
+        .tier-table { width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:12px; border:1px solid var(--border); }
+        .tier-table th,.tier-table td { padding:10px 8px; text-align:center; font-variant-numeric:tabular-nums; }
+        .tier-table th { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); font-weight:600; border-bottom:1px solid var(--border); }
+        .tier-table td { font-size:0.85rem; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.04); }
+        
+        .section-block { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; overflow:hidden; }
+        .section-header { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer; user-select:none; }
+        .section-header-static { padding:12px 14px 4px; }
+        .section-title { font-size:0.9rem; font-weight:600; }
+        .section-block.open .chevron { transform:rotate(90deg); }
+        .section-body { padding:0 10px 10px; }
+        
+        .weapon-table { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:8px; }
+        .weapon-table:last-child { margin-bottom:0; }
+        .weapon-table-header { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border); }
+        .weapon-table-name { font-weight:700; font-size:0.9rem; }
+        .weapon-table-phase { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; }
+        .weapon-table-row { display:grid; grid-template-columns:repeat(4,1fr); }
+        .weapon-table-row.alt { background:rgba(255,255,255,0.02); }
+        .weapon-table-cell { padding:8px 6px; text-align:center; border-right:1px solid rgba(255,255,255,0.04); }
+        .weapon-table-cell:last-child { border-right:none; }
+        .weapon-table-cell span { display:block; font-size:0.55rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:2px; }
+        .weapon-table-cell strong { font-size:0.8rem; font-weight:600; }
+        .weapon-table-keywords { padding:8px 12px; border-top:1px solid var(--border); display:flex; flex-wrap:wrap; gap:6px; }
+        
+        .ability { background:var(--panel-3); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; overflow:hidden; }
+        .ability.glossary-entry { border-left:3px solid var(--glossary); }
+        .ability.glossary-entry.tag-entry { border-left-color:var(--accent); }
+        .ability:last-child { margin-bottom:0; }
+        .glossary-section-header { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); padding:8px 4px; margin-bottom:8px; border-bottom:1px solid var(--border); }
+        .ability-header-static { padding:10px 12px 4px; }
+        .ability-title { font-size:0.88rem; font-weight:600; }
+        .ability-meta { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+        .ability-body { padding:0 12px 10px; font-size:0.85rem; line-height:1.5; }
+        .keyword { background:rgba(139,92,246,0.2); color:#a78bfa; padding:1px 4px; border-radius:4px; cursor:pointer; font-weight:500; transition:background 0.15s; }
+        .keyword:hover { background:rgba(139,92,246,0.35); }
+        
+        /* Tactical Card */
+        .tactical-card { background:var(--panel-3); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; border-left:3px solid var(--tactical); }
+        .tactical-card.in-army { border-color:var(--gas); }
+        .tactical-header { padding:12px 14px; cursor:pointer; user-select:none; }
+        .tactical-title-row { display:flex; justify-content:space-between; align-items:center; }
+        .tactical-name { font-size:1rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+        .tactical-right { display:flex; align-items:center; gap:10px; }
+        .tactical-cost { font-size:0.85rem; font-weight:700; color:var(--gas); }
+        .tactical-info { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+        .tactical-pill { font-size:0.7rem; padding:3px 8px; border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,0.03); color:var(--muted); }
+        .tactical-body { padding:0 12px 12px; }
+        
+        .army-upgrade { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--panel-2); border-radius:var(--radius-sm); margin-bottom:6px; }
+        .army-upgrade-card { background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; overflow:hidden; }
+        .army-upgrade-card.selected { border-color:var(--accent); background:rgba(139,92,246,0.1); }
+        .army-upgrade-card:last-child { margin-bottom:0; }
+        .army-upgrade-header { display:flex; justify-content:space-between; align-items:flex-start; padding:10px 12px; }
+        .army-upgrade-name { font-weight:600; font-size:0.9rem; }
+        .army-upgrade-meta { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+        .army-upgrade-desc { padding:0 12px 10px; font-size:0.85rem; line-height:1.5; color:var(--text); }
+        .upgrade-toggle { width:20px; height:20px; border-radius:4px; border:2px solid var(--border); background:transparent; cursor:pointer; display:grid; place-items:center; transition:all 0.15s; }
+        .upgrade-toggle.active { background:var(--accent); border-color:var(--accent); }
+        .upgrade-toggle.active::after { content:'✓'; color:white; font-size:12px; font-weight:700; }
+        .remove-unit { padding:8px 16px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:var(--radius-sm); color:var(--error); font-size:0.85rem; font-weight:600; cursor:pointer; margin-top:12px; width:100%; }
+        
+        /* Modal */
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:grid; place-items:center; z-index:1000; padding:20px; animation:fadeIn 0.15s; }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        .modal { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); max-width:380px; width:100%; max-height:80vh; overflow-y:auto; animation:slideUp 0.2s; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        .modal-header { padding:16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+        .modal-title { font-weight:700; font-size:1.1rem; }
+        .modal-type { font-size:0.8rem; color:var(--muted); margin-top:2px; }
+        .modal-close { width:32px; height:32px; border-radius:50%; border:none; background:var(--panel-2); color:var(--muted); font-size:18px; cursor:pointer; display:grid; place-items:center; }
+        .modal-body { padding:16px; font-size:0.9rem; line-height:1.6; }
+        .tier-option { padding:14px; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; cursor:pointer; transition:all 0.15s; }
+        .tier-option:hover { border-color:var(--accent); }
+        .tier-option-main { display:flex; justify-content:space-between; align-items:center; }
+        .tier-option-models { font-weight:600; }
+        .tier-option-cost { color:var(--warning); font-weight:600; }
+        .tier-option-supply { font-size:0.8rem; color:var(--muted); margin-top:4px; }
+        .empty-state { text-align:center; padding:30px 20px; color:var(--muted); }
+        .empty-state-text { font-size:0.85rem; }
+      `}</style>
+
+      {/* Faction & Scale Selector */}
+      <Collapsible
+        className="group-card"
+        defaultOpen={true}
+        header={<div className="group-header"><div><div className="group-title">Setup</div><div className="group-subtitle">{selectedFaction?.name} · {selectedScale?.name}</div></div><span className="chevron">›</span></div>}
+      >
+        <div className="group-body" style={{ gap: 12 }}>
+          <div className="selector-group">
+            <div className="faction-label">Faction Card</div>
+            <div className="faction-options">
+              {ZERG_FACTION_CARDS.map(f => (
+                <button key={f.id} className={`faction-option ${selectedFaction?.id === f.id ? 'active' : ''}`} onClick={() => setSelectedFaction(f)}>
+                  {f.name.replace("Kerrigan's ", '').replace(' Swarm', '')}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="selector-group">
+            <div className="faction-label">Battle Size</div>
+            <div className="scale-options">
+              {ENGAGEMENT_SCALES.map(s => (
+                <button key={s.id} className={`scale-option ${selectedScale?.id === s.id ? 'active' : ''}`} onClick={() => setSelectedScale(s)}>
+                  <span className="scale-name">{s.name}</span>
+                  <span className="scale-limits">{s.id === 'grand' ? '2000+' : s.minerals} / {s.id === 'grand' ? '200+' : s.gas}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Collapsible>
+
+      {/* Army Header - Sticky */}
+      <div className={`army-header ${headerOpen ? 'open' : ''}`}>
+        <div className="army-header-top" onClick={() => setHeaderOpen(!headerOpen)}>
+          <div className="army-title">Army</div>
+          <div className="army-header-summary">
+            <span className={`minerals ${mineralsOver ? 'over' : ''}`}>{mineralsRemaining} min</span>
+            <span className={`gas ${gasOver ? 'over' : ''}`}>{gasRemaining} gas</span>
+            <span>S{supply}</span>
+          </div>
+          <span className="chevron">›</span>
+        </div>
+        {headerOpen && (
+          <div className="army-header-body">
+            <div className="army-stats">
+              <div className="army-stat">
+                <div className="army-stat-label">Minerals Left</div>
+                <div className={`army-stat-value minerals ${mineralsOver ? 'over' : ''}`}>{mineralsRemaining}</div>
+              </div>
+              <div className="army-stat">
+                <div className="army-stat-label">Gas Left</div>
+                <div className={`army-stat-value gas ${gasOver ? 'over' : ''}`}>{gasRemaining}</div>
+              </div>
+              <div className="army-stat">
+                <div className="army-stat-label">Supply</div>
+                <div className="army-stat-value">{supply}</div>
+              </div>
+            </div>
+            <div className="army-slots">
+              {Object.entries(totalSlots).map(([slot, available]) => {
+                const used = slotsUsed[slot] || 0;
+                return <span key={slot} className={`slot-badge ${used > available ? 'over' : 'ok'}`}>{slot.toUpperCase()}: {used}/{available}</span>;
+              })}
+            </div>
+            <div className="army-actions">
+              <button className="army-btn" onClick={handleExport}>Export</button>
+              <button className="army-btn danger" onClick={() => setShowClearConfirm(true)}>Clear</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Your Army Divider */}
+      {(armyUnits.length > 0 || armyTactical.length > 0) && (
+        <div className="library-divider">
+          <div className="library-divider-line"></div>
+          <span className="library-divider-text">Your Army</span>
+          <div className="library-divider-line"></div>
+        </div>
+      )}
+
+      {/* Army Units List */}
+      {(armyUnits.length > 0 || armyTactical.length > 0) && (
+        <div className="army-section">
+          {armyTactical.length > 0 && (
+            <>
+              <div className="army-section-title">Tactical Cards</div>
+              {armyTactical.map((card, idx) => (
+                <ArmyTacticalCard key={idx} card={card} onRemove={() => handleRemoveTactical(idx)} onKeywordClick={setKeywordModal} />
+              ))}
+            </>
+          )}
+          {armyUnits.length > 0 && (
+            <>
+              <div className="army-section-title" style={{ marginTop: armyTactical.length > 0 ? 12 : 0 }}>Units</div>
+              {armyUnits.map((entry, idx) => (
+                <ArmyUnitCard key={idx} entry={entry} onRemove={() => handleRemoveUnit(idx)} onToggleUpgrade={(upg) => handleToggleUpgrade(idx, upg)} onKeywordClick={setKeywordModal} />
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Library Divider */}
+      <div className="library-divider">
+        <div className="library-divider-line"></div>
+        <span className="library-divider-text">Card Library</span>
+        <div className="library-divider-line"></div>
+      </div>
+
+      {/* Units Browser */}
+      <Collapsible 
+        className="group-card" 
+        defaultOpen={false}
+        header={<div className="group-header"><div><div className="group-title">Units</div><div className="group-subtitle">{ZERG_UNITS.length} available</div></div><span className="chevron">›</span></div>}
+      >
+        <div className="group-body">
+          {['Hero', 'Elite', 'Core', 'Support', 'Other'].map(role => {
+            const unitsInRole = ZERG_UNITS.filter(u => u.role === role);
+            if (unitsInRole.length === 0) return null;
+            return (
+              <div key={role} className="role-group">
+                <div className={`role-group-header role-${role.toLowerCase()}`}>
+                  <span className="role-group-dot"></span>
+                  <span className="role-group-name">{role}</span>
+                  <span className="role-group-count">{unitsInRole.length}</span>
+                </div>
+                {unitsInRole.map(unit => (
+                  <UnitCard 
+                    key={unit.id} 
+                    unit={unit} 
+                    onAddToArmy={handleAddUnit} 
+                    onKeywordClick={setKeywordModal}
+                    isInArmy={unitIdsInArmy.includes(unit.id)}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </Collapsible>
+
+      {/* Tactical Cards Browser */}
+      <Collapsible 
+        className="group-card" 
+        defaultOpen={false}
+        header={<div className="group-header"><div><div className="group-title">Tactical Cards</div><div className="group-subtitle">{ZERG_TACTICAL_CARDS.length} available</div></div><span className="chevron">›</span></div>}
+      >
+        <div className="group-body">
+          {ZERG_TACTICAL_CARDS.map(card => (
+            <TacticalCard 
+              key={card.id} 
+              card={card} 
+              onKeywordClick={setKeywordModal}
+              onAddToArmy={handleAddTactical}
+              isInArmy={tacticalIdsInArmy.includes(card.id)}
+            />
+          ))}
+        </div>
+      </Collapsible>
+
+      {/* Glossary */}
+      <Collapsible 
+        className="group-card" 
+        defaultOpen={false}
+        header={<div className="group-header"><div><div className="group-title">Glossary</div><div className="group-subtitle">Tags & Keywords reference</div></div><span className="chevron">›</span></div>}
+      >
+        <div className="group-body">
+          <div className="glossary-section-header">Surge Tags</div>
+          {Object.entries(TAGS).filter(([tag]) => SURGE_TAGS.includes(tag)).sort(([a], [b]) => a.localeCompare(b)).map(([tag, data]) => (
+            <div key={tag} className="ability open glossary-entry tag-entry">
+              <div className="ability-header-static"><div><div className="ability-title">{tag}</div><div className="ability-meta">{data.type}</div></div></div>
+              <div className="ability-body">{data.description}</div>
+            </div>
+          ))}
+          <div className="glossary-section-header" style={{ marginTop: 16 }}>Type Tags</div>
+          {Object.entries(TAGS).filter(([tag]) => TYPE_TAGS.includes(tag)).sort(([a], [b]) => a.localeCompare(b)).map(([tag, data]) => (
+            <div key={tag} className="ability open glossary-entry tag-entry">
+              <div className="ability-header-static"><div><div className="ability-title">{tag}</div><div className="ability-meta">{data.type}</div></div></div>
+              <div className="ability-body">{data.description}</div>
+            </div>
+          ))}
+          <div className="glossary-section-header" style={{ marginTop: 16 }}>Special Tags</div>
+          {Object.entries(TAGS).filter(([tag]) => !SURGE_TAGS.includes(tag) && !TYPE_TAGS.includes(tag)).sort(([a], [b]) => a.localeCompare(b)).map(([tag, data]) => (
+            <div key={tag} className="ability open glossary-entry tag-entry">
+              <div className="ability-header-static"><div><div className="ability-title">{tag}</div><div className="ability-meta">{data.type}</div></div></div>
+              <div className="ability-body">{data.description}</div>
+            </div>
+          ))}
+          <div className="glossary-section-header" style={{ marginTop: 16 }}>Keywords</div>
+          {Object.entries(KEYWORDS).sort(([a], [b]) => a.localeCompare(b)).map(([keyword, data]) => (
+            <div key={keyword} className="ability open glossary-entry">
+              <div className="ability-header-static"><div><div className="ability-title">{keyword}</div><div className="ability-meta">{data.type}</div></div></div>
+              <div className="ability-body">{data.description}</div>
+            </div>
+          ))}
+        </div>
+      </Collapsible>
+
+      {/* Modals */}
+      {keywordModal && <KeywordModal keyword={keywordModal} onClose={() => setKeywordModal(null)} />}
+      {tierPicker && <TierPickerModal unit={tierPicker} onSelect={handleSelectTier} onClose={() => setTierPicker(null)} />}
+      {showClearConfirm && (
+        <div className="modal-overlay" onClick={() => setShowClearConfirm(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div><div className="modal-title">Clear Army?</div><div className="modal-type">This will remove all units and tactical cards</div></div>
+              <button className="modal-close" onClick={() => setShowClearConfirm(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', gap: 8 }}>
+              <button className="army-btn" style={{ flex: 1 }} onClick={() => setShowClearConfirm(false)}>Cancel</button>
+              <button className="remove-unit" style={{ flex: 1, marginTop: 0 }} onClick={handleClearArmy}>Clear Army</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {exportText && (
+        <div className="modal-overlay" onClick={() => setExportText(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <div><div className="modal-title">Export Army</div><div className="modal-type">Copy the text below</div></div>
+              <button className="modal-close" onClick={() => setExportText(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <textarea 
+                readOnly 
+                value={exportText} 
+                style={{ width: '100%', height: 200, background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'monospace', resize: 'none' }}
+                onFocus={e => e.target.select()}
+              />
+              <button className="army-btn" style={{ width: '100%', marginTop: 12 }} onClick={() => setExportText(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const container = document.getElementById('root');
+const root = ReactDOM.createRoot(container);
+root.render(React.createElement(App));
+  </script>
+</body>
+</html>

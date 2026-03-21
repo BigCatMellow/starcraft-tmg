@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a1a">
+  <title>StarCraft: TMG</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --panel: #242424;
+      --panel-2: #2a2a2a;
+      --panel-3: #303030;
+      --text: #f0eee8;
+      --muted: #a8a299;
+      --border: #3a3a3a;
+      --accent: #eab308;
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      background: var(--bg); 
+      color: var(--text); 
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .app { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding: 16px; }
+    
+    .header { text-align: center; padding: 32px 16px 24px; }
+    .logo { font-size: 2.5rem; margin-bottom: 8px; }
+    .title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+    .subtitle { font-size: 0.9rem; color: var(--muted); }
+    
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 12px; padding-left: 4px; }
+    
+    .card-grid { display: flex; flex-direction: column; gap: 12px; }
+    
+    .faction-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .faction-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--card-color);
+    }
+    .faction-card:hover, .faction-card:active {
+      border-color: var(--card-color);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--panel-2);
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+      border: 1px solid var(--border);
+    }
+    .card-titles { flex: 1; }
+    .card-name {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .card-tagline {
+      font-size: 0.8rem;
+      color: var(--card-color);
+      font-weight: 600;
+    }
+    .card-arrow {
+      font-size: 1.5rem;
+      color: var(--muted);
+      transition: transform 0.2s;
+    }
+    .faction-card:hover .card-arrow {
+      transform: translateX(4px);
+      color: var(--card-color);
+    }
+    
+    .card-desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.4;
+      padding-left: 64px;
+    }
+    
+    .tool-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .tool-card:hover, .tool-card:active {
+      border-color: var(--card-color);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .tool-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--panel-2), var(--panel-3));
+      display: grid;
+      place-items: center;
+      font-size: 1.8rem;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .tool-info { flex: 1; }
+    .tool-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .tool-tagline {
+      font-size: 0.75rem;
+      color: var(--card-color);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .tool-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    
+    .footer {
+      text-align: center;
+      padding: 24px 16px;
+      border-top: 1px solid var(--border);
+      margin-top: 32px;
+    }
+    .footer-text {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    
+    .quick-ref {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .quick-ref-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .quick-ref-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .ref-item {
+      background: var(--panel-2);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .ref-label {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 2px;
+    }
+    .ref-value {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+    .ref-value.standard { color: #a855f7; }
+    .ref-value.skirmish { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="logo">⚔️</div>
+      <div class="title">StarCraft: TMG</div>
+      <div class="subtitle">The Miniatures Game Companion</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Army Builders</div>
+      <div class="card-grid">
+        <a href="zerg.html" class="faction-card" style="--card-color: #9333ea">
+          <div class="card-header">
+            <div class="card-icon">🦂</div>
+            <div class="card-titles">
+              <div class="card-name">Zerg</div>
+              <div class="card-tagline">The Swarm</div>
+            </div>
+            <span class="card-arrow">›</span>
+          </div>
+          <div class="card-desc">Overwhelming numbers and rapid evolution</div>
+        </a>
+        
+        <a href="terran.html" class="faction-card" style="--card-color: #1d4ed8">
+          <div class="card-header">
+            <div class="card-icon">🎖️</div>
+            <div class="card-titles">
+              <div class="card-name">Terran</div>
+              <div class="card-tagline">Dominion Forces</div>
+            </div>
+            <span class="card-arrow">›</span>
+          </div>
+          <div class="card-desc">Versatile infantry and heavy firepower</div>
+        </a>
+        
+        <a href="protoss.html" class="faction-card" style="--card-color: #eab308">
+          <div class="card-header">
+            <div class="card-icon">⚡</div>
+            <div class="card-titles">
+              <div class="card-name">Protoss</div>
+              <div class="card-tagline">The Firstborn</div>
+            </div>
+            <span class="card-arrow">›</span>
+          </div>
+          <div class="card-desc">Advanced technology and psionic power</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Battle Setup</div>
+      <a href="missions.html" class="tool-card" style="--card-color: #06b6d4">
+        <div class="tool-icon">🗺️</div>
+        <div class="tool-info">
+          <div class="tool-name">Missions & Maps</div>
+          <div class="tool-tagline">Battle Setup</div>
+          <div class="tool-desc">Select missions, maps, and deployment zones</div>
+        </div>
+        <span class="card-arrow">›</span>
+      </a>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Quick Reference</div>
+      <div class="quick-ref">
+        <div class="quick-ref-title">📊 Battle Sizes</div>
+        <div class="quick-ref-grid">
+          <div class="ref-item">
+            <div class="ref-label">Standard</div>
+            <div class="ref-value standard">2000 Minerals</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-label">Standard</div>
+            <div class="ref-value standard">54" × 36"</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-label">Skirmish</div>
+            <div class="ref-value skirmish">1000 Minerals</div>
+          </div>
+          <div class="ref-item">
+            <div class="ref-label">Skirmish</div>
+            <div class="ref-value skirmish">36" × 36"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-text">
+        StarCraft: The Miniatures Game<br>
+        Fan-made companion app
+      </div>
+    </div>
+  </div>
+</body>
+</html>
