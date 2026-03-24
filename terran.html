@@ -2,16 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Terran Army Builder - StarCraft TMG</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a1a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#1a1a1a">
-  <title>Terran Army Builder - StarCraft: TMG</title>
-  <link rel="manifest" href="manifest.json">
-<style>
-.home-btn { position: fixed; top: 12px; left: 12px; width: 40px; height: 40px; border-radius: 10px; background: #242424; border: 1px solid #3a3a3a; color: #f0eee8; font-size: 1.2rem; display: grid; place-items: center; cursor: pointer; z-index: 100; text-decoration: none; }
-.home-btn:hover { background: #2a2a2a; border-color: #eab308; }
-</style>
 </head>
 <body>
   <div id="root"></div>
@@ -617,48 +613,217 @@ function App() {
   
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [exportText, setExportText] = useState(null);
+  const [showExportChoice, setShowExportChoice] = useState(false);
   
   const handleClearArmy = useCallback(() => { setArmyUnits([]); setArmyTactical([]); setShowClearConfirm(false); }, []);
-  const handleExport = useCallback(() => {
-    const lines = [`=== ${selectedFaction?.name || 'Terran'} Army ===`, `${selectedScale.name}`, ''];
+  
+  // Generate Quick Reference export
+  const generateQuickExport = useCallback(() => {
+    const lines = [];
+    const divider = '═'.repeat(50);
+    const thinDivider = '─'.repeat(50);
     
-    // Calculate warnings
+    // Header
+    lines.push(divider);
+    lines.push(`  ${selectedFaction?.name?.toUpperCase() || 'TERRAN'} · ${selectedScale.name}`);
+    lines.push(divider);
+    lines.push('');
+    
+    // Warnings
     const warnings = [];
     if (selectedScale.id !== 'grand') {
-      if (minerals > selectedScale.minerals) warnings.push(`⚠ MINERALS: ${minerals}/${selectedScale.minerals}`);
-      if (gas > selectedScale.gas) warnings.push(`⚠ GAS: ${gas}/${selectedScale.gas}`);
+      if (minerals > selectedScale.minerals) warnings.push(`⚠ OVER MINERALS: ${minerals}/${selectedScale.minerals}`);
+      if (gas > selectedScale.gas) warnings.push(`⚠ OVER GAS: ${gas}/${selectedScale.gas}`);
     }
-    const currentSlotsUsed = { hero: 0, elite: 0, core: 0, support: 0 };
-    armyUnits.forEach(u => {
-      const role = u.unit.role.toLowerCase();
-      if (currentSlotsUsed[role] !== undefined) currentSlotsUsed[role] += u.tier.supply || 1;
-    });
-    const currentTotalSlots = { ...(selectedFaction?.slots || {}) };
-    armyTactical.forEach(t => {
-      Object.entries(t.slots).forEach(([slot, count]) => {
-        currentTotalSlots[slot] = (currentTotalSlots[slot] || 0) + count;
-      });
-    });
-    Object.entries(currentSlotsUsed).forEach(([slot, used]) => {
-      const available = currentTotalSlots[slot] || 0;
-      if (used > available) warnings.push(`⚠ ${slot.toUpperCase()}: ${used}/${available}`);
-    });
     if (warnings.length > 0) {
       lines.push(...warnings, '');
     }
     
+    // Faction Card
+    lines.push(`FACTION: ${selectedFaction?.name} .............. ${selectedFaction?.resource}`);
+    const slotStr = Object.entries(selectedFaction?.slots || {}).map(([s, c]) => `${s.charAt(0).toUpperCase()}${c}`).join(' · ');
+    lines.push(`  Slots: ${slotStr}`);
+    lines.push('');
+    
     // Tactical Cards
     if (armyTactical.length > 0) {
-      lines.push('── TACTICAL CARDS ──', '');
+      const totalGas = armyTactical.reduce((sum, t) => sum + (t.cost || 0), 0);
+      lines.push(`TACTICAL CARDS ${'.'.repeat(30)} ${totalGas} Gas`);
+      lines.push(thinDivider);
       armyTactical.forEach(t => {
-        lines.push(`▸ ${t.name}${t.unique ? ' [Unique]' : ''} - ${t.cost} Gas`);
-        if (t.resource) lines.push(`  Resource: ${t.resource}`);
-        if (Object.keys(t.slots).length > 0) {
-          lines.push(`  Slots: ${Object.entries(t.slots).map(([s, c]) => `${s.toUpperCase()} +${c}`).join(', ')}`);
+        const slotInfo = Object.entries(t.slots || {}).map(([s, c]) => `${s.charAt(0).toUpperCase()}+${c}`).join(' ');
+        lines.push(`${t.name}${t.unique ? ' [U]' : ''} ${'.'.repeat(Math.max(3, 38 - t.name.length))} ${t.cost} Gas`);
+        lines.push(`  ${t.resource || ''} ${slotInfo}`);
+        t.abilities?.forEach(a => {
+          const costStr = a.cost ? `/${a.cost}` : '';
+          lines.push(`  ◆ ${a.name} (${a.phase.replace(' Phase', '')}·${a.type}${costStr})`);
+        });
+      });
+      lines.push('');
+    }
+    
+    // Units by Role
+    if (armyUnits.length > 0) {
+      lines.push(`UNITS ${'.'.repeat(38)} ${minerals} Mins`);
+      lines.push(thinDivider);
+      
+      ['Hero', 'Elite', 'Core', 'Support', 'Other'].forEach(role => {
+        const unitsInRole = armyUnits.filter(e => e.unit.role === role);
+        if (unitsInRole.length === 0) return;
+        
+        lines.push(`▸ ${role.toUpperCase()}`);
+        unitsInRole.forEach(entry => {
+          const { unit, tier, selectedUpgrades } = entry;
+          const upgCost = selectedUpgrades.reduce((sum, u) => sum + (parseInt(String(u.cost).split('/')[0]) || 0), 0);
+          const unitTotal = entry.cost + upgCost;
+          const modelStr = tier.models !== '-' ? ` ×${tier.models}` : '';
+          
+          lines.push(`  ${unit.name}${modelStr}${unit.unique ? ' [U]' : ''} ${'.'.repeat(Math.max(3, 32 - unit.name.length - modelStr.length))} ${unitTotal} pts`);
+          
+          // Compact stats
+          const s = unit.stats;
+          lines.push(`    ${s.shield ? 'SH'+s.shield+' · ' : ''}SPD ${s.speed} · EVA ${s.evade || '—'} · ARM ${s.armour} · HP ${s.hp}`);
+          
+          // Weapons - compact
+          unit.weapons?.forEach(w => {
+            const surgeStr = w.surge && w.surge !== '—' ? ` Surge:${w.surge}→${w.sDie}` : '';
+            lines.push(`    • ${w.name}: ${w.range === 'E' ? 'Melee' : w.range+'"'} RoA${w.roa} ${w.hit} ${w.damage}dmg${surgeStr}`);
+          });
+          
+          // Abilities - compact
+          const allAbilities = [...(unit.abilities || []), ...Object.entries(unit.phaseAbilities || {}).flatMap(([phase, abs]) => abs.map(a => ({ ...a, phase })))];
+          allAbilities.forEach(a => {
+            const costStr = a.cost ? `/${a.cost}` : '';
+            lines.push(`    ◆ ${a.name} (${a.phase.replace(' Phase', '')}·${a.type}${costStr})`);
+          });
+          
+          // Selected upgrades
+          selectedUpgrades.forEach(u => {
+            lines.push(`    ✓ ${u.name} (+${u.cost}pts)`);
+          });
+        });
+        lines.push('');
+      });
+    }
+    
+    // Footer
+    lines.push(divider);
+    if (selectedScale.id !== 'grand') {
+      lines.push(`  ${minerals}/${selectedScale.minerals} Mins · ${gas}/${selectedScale.gas} Gas · Supply ${supply}`);
+    } else {
+      lines.push(`  ${minerals} Mins · ${gas} Gas · Supply ${supply}`);
+    }
+    lines.push(divider);
+    
+    return lines.join('\n');
+  }, [armyUnits, armyTactical, selectedFaction, selectedScale, minerals, gas, supply]);
+  
+  // Generate Full Guide export
+  const generateFullExport = useCallback(() => {
+    const lines = [];
+    const divider = '═'.repeat(65);
+    const thinDivider = '─'.repeat(65);
+    
+    // Header
+    lines.push(divider);
+    lines.push(`  ${selectedFaction?.name?.toUpperCase() || 'TERRAN'} ARMY`);
+    lines.push(`  ${selectedScale.name} Battle (${selectedScale.minerals} Minerals / ${selectedScale.gas} Gas)`);
+    lines.push(divider);
+    lines.push('');
+    
+    // Quick Legend
+    lines.push('HOW TO READ THIS SHEET');
+    lines.push(thinDivider);
+    lines.push('ABILITY TYPES:');
+    lines.push('  • Active = Use during your unit\'s activation (before or after action)');
+    lines.push('  • Passive = Always on, no activation needed');
+    lines.push('  • Reaction = Triggered by a specific event (declare immediately)');
+    lines.push('');
+    lines.push('PHASES (when abilities/weapons can be used):');
+    lines.push('  • Any Phase = Usable in Movement, Assault, Combat, or Scoring');
+    lines.push('  • Movement Phase = When units deploy, move, disengage');
+    lines.push('  • Assault Phase = When units shoot or charge');
+    lines.push('  • Combat Phase = Melee attacks (engaged units must fight)');
+    lines.push('');
+    lines.push('WEAPON STATS:');
+    lines.push('  • Range = Distance in inches (or "Engaged" for melee)');
+    lines.push('  • Target = What it can hit (Ground, All, etc.)');
+    lines.push('  • RoA = Rate of Attack (dice per model)');
+    lines.push('  • Hit = Roll this or higher to hit');
+    lines.push('  • Damage = Damage per successful hit');
+    lines.push('');
+    lines.push('SURGE (bonus damage):');
+    lines.push('  • Surge Type on weapon = What enemy TAGS trigger bonus damage');
+    lines.push('  • If target has matching tag, the Surge Die deals extra damage');
+    lines.push('  • This bonus damage BYPASSES ARMOR');
+    lines.push('');
+    lines.push('RESOURCES: Exhaust (flip face-down) Faction/Tactical cards to pay costs');
+    lines.push(`  • Zerg uses Biomass (BM) · Terran uses Command Points (CP)`);
+    lines.push(`  • Protoss uses Psionic Energy (EN)`);
+    lines.push('');
+    lines.push('');
+    
+    // Faction Card
+    lines.push('FACTION CARD');
+    lines.push(thinDivider);
+    lines.push(`${selectedFaction?.name}`);
+    lines.push(`Resource: ${selectedFaction?.resource}`);
+    lines.push(`  └─ Exhaust this card to generate ${selectedFaction?.resource?.replace('+', '')} for ability costs`);
+    lines.push('');
+    const slotStr = Object.entries(selectedFaction?.slots || {}).map(([s, c]) => `${s.charAt(0).toUpperCase() + s.slice(1)} ×${c}`).join(' · ');
+    lines.push(`Unit Slots: ${slotStr}`);
+    lines.push(`  └─ This determines how many units of each role you can include`);
+    lines.push('');
+    
+    if (selectedFaction?.abilities?.length > 0) {
+      lines.push('Abilities:');
+      lines.push('');
+      selectedFaction.abilities.forEach(a => {
+        lines.push(`◆ ${a.name}`);
+        lines.push(`  WHEN: ${a.phase}`);
+        if (a.phase === 'Any Phase') {
+          lines.push(`    └─ Can be used during Movement, Assault, Combat, or Scoring`);
+        } else {
+          lines.push(`    └─ Only usable during the ${a.phase}`);
         }
-        t.abilities.forEach(a => {
-          lines.push(`  • ${a.name} (${a.phase} · ${a.type})`);
-          lines.push(`    ${a.description}`);
+        lines.push(`  TYPE: ${a.type}`);
+        if (a.type === 'Active') {
+          lines.push(`    └─ Requires your unit to be currently activated`);
+        } else if (a.type === 'Passive') {
+          lines.push(`    └─ Always in effect while unit is on the battlefield`);
+        } else if (a.type === 'Reaction') {
+          lines.push(`    └─ Declare immediately when the trigger event occurs`);
+        }
+        lines.push(`  EFFECT: ${a.description}`);
+        lines.push('');
+      });
+    }
+    lines.push('');
+    
+    // Tactical Cards
+    if (armyTactical.length > 0) {
+      lines.push('TACTICAL CARDS');
+      lines.push(thinDivider);
+      
+      armyTactical.forEach(t => {
+        lines.push(`${t.name}${t.unique ? ' [Unique]' : ''}`);
+        lines.push(`Cost: ${t.cost} Gas`);
+        if (t.resource) {
+          lines.push(`Resource: ${t.resource}`);
+          lines.push(`  └─ Exhaust this card to generate ${t.resource.replace('+', '')} for ability costs`);
+        }
+        if (Object.keys(t.slots || {}).length > 0) {
+          const slots = Object.entries(t.slots).map(([s, c]) => `${s.charAt(0).toUpperCase() + s.slice(1)} +${c}`).join(', ');
+          lines.push(`Adds Slots: ${slots}`);
+          lines.push(`  └─ Allows you to include more units of these roles`);
+        }
+        lines.push('');
+        t.abilities?.forEach(a => {
+          lines.push(`◆ ${a.name}`);
+          lines.push(`  WHEN: ${a.phase}`);
+          lines.push(`  TYPE: ${a.type}`);
+          lines.push(`  EFFECT: ${a.description}`);
+          lines.push('');
         });
         lines.push('');
       });
@@ -666,46 +831,106 @@ function App() {
     
     // Units
     if (armyUnits.length > 0) {
-      lines.push('── UNITS ──', '');
+      lines.push('UNITS');
+      lines.push(thinDivider);
+      
       armyUnits.forEach(entry => {
         const { unit, tier, selectedUpgrades } = entry;
-        const upgCost = selectedUpgrades.reduce((sum, u) => { const cost = typeof u.cost === 'string' ? parseInt(u.cost.split('/')[0]) : u.cost; return sum + (cost || 0); }, 0);
+        const upgCost = selectedUpgrades.reduce((sum, u) => sum + (parseInt(String(u.cost).split('/')[0]) || 0), 0);
         const unitTotal = entry.cost + upgCost;
         
-        lines.push(`▸ ${unit.name}${unit.unique ? ' [Unique]' : ''} - ${unitTotal} pts`);
-        lines.push(`  ${tier.models} models · Supply ${tier.supply} · ${unit.role}`);
-        lines.push(`  Tags: ${unit.tags.join(', ')}`);
+        lines.push('');
+        lines.push(`${unit.name}${unit.unique ? ' [Unique]' : ''}`);
+        lines.push(`${'─'.repeat(unit.name.length + (unit.unique ? 9 : 0))}`);
+        lines.push(`Role: ${unit.role}    Models: ${tier.models}    Points: ${unitTotal}    Supply: ${tier.supply}`);
+        lines.push('');
+        
+        // Tags
+        lines.push(`Tags: ${unit.tags.join(', ')}`);
+        lines.push(`  └─ Used for targeting restrictions and Surge damage bonuses`);
+        const surgeTags = unit.tags.filter(t => ['Armoured', 'Biological', 'Light', 'Mechanical'].includes(t));
+        if (surgeTags.length > 0) {
+          lines.push(`  └─ Weapons with Surge: ${surgeTags.join('/')} deal bonus damage to this unit`);
+        }
+        lines.push('');
         
         // Stats
-        const stats = unit.stats;
-        lines.push(`  Stats: SH ${stats.shield ?? '—'} | SP ${stats.speed} | EV ${stats.evade ?? '—'} | AR ${stats.armour} | HP ${stats.hp} | SZ ${stats.size}`);
+        const s = unit.stats;
+        lines.push('STATS:');
+        if (s.shield) lines.push(`  Shield: ${s.shield} (extra HP on first model, lost when broken)`);
+        lines.push(`  Speed: ${s.speed}${String(s.speed).includes('/') ? ' (second value when condition met)' : ''}`);
+        if (s.evade && s.evade !== '—') {
+          lines.push(`  Evade: ${s.evade} (roll this to avoid damage after armor fails)`);
+        } else {
+          lines.push(`  Evade: — (no evade roll unless granted by ability)`);
+        }
+        lines.push(`  Armour: ${s.armour} (roll this to block incoming damage)`);
+        lines.push(`  HP: ${s.hp} (damage each model can take before destroyed)`);
+        lines.push(`  Size: ${s.size} (affects terrain and gap clearance)`);
+        lines.push('');
         
         // Weapons
-        if (unit.weapons.length > 0) {
-          lines.push('  Weapons:');
+        if (unit.weapons?.length > 0) {
+          lines.push('WEAPONS:');
+          lines.push('');
           unit.weapons.forEach(w => {
-            lines.push(`    • ${w.name} (${w.phase})`);
-            lines.push(`      RNG ${w.range} | TGT ${w.target} | RoA ${w.roa} | Hit ${w.hit} | Surge ${w.surge || '—'} | S.Die ${w.sDie || '—'} | Dmg ${w.damage}`);
-            if (w.keywords?.length > 0) lines.push(`      Keywords: ${w.keywords.join(', ')}`);
+            lines.push(`  ${w.name}`);
+            lines.push(`  Phase: ${w.phase} Phase`);
+            if (w.phase === 'Assault') {
+              lines.push(`    └─ Used when shooting (ranged attacks)`);
+            } else if (w.phase === 'Combat') {
+              lines.push(`    └─ Used in melee (close combat when engaged)`);
+            }
+            lines.push(`  ┌${'─'.repeat(55)}┐`);
+            lines.push(`  │ Range: ${(w.range === 'E' ? 'Engaged (melee)' : w.range + '"').padEnd(20)} Target: ${w.target.padEnd(16)} │`);
+            lines.push(`  │ Rate of Attack: ${String(w.roa).padEnd(14)} Hit: ${w.hit.padEnd(18)} │`);
+            lines.push(`  │ Damage: ${String(w.damage).padEnd(46)} │`);
+            if (w.surge && w.surge !== '—') {
+              lines.push(`  │${'─'.repeat(55)}│`);
+              lines.push(`  │ SURGE TYPE: ${w.surge.padEnd(42)} │`);
+              lines.push(`  │  └─ If target has "${w.surge}" tag, Surge Die deals ${w.sDie} extra │`);
+              lines.push(`  │     damage that BYPASSES ARMOR!${' '.repeat(21)} │`);
+            }
+            lines.push(`  └${'─'.repeat(55)}┘`);
+            if (w.keywords?.length > 0) {
+              lines.push(`  Keywords: ${w.keywords.join(', ')}`);
+              lines.push(`    └─ See Glossary for keyword definitions`);
+            }
+            lines.push('');
           });
         }
         
         // Abilities
         const allAbilities = [...(unit.abilities || []), ...Object.entries(unit.phaseAbilities || {}).flatMap(([phase, abs]) => abs.map(a => ({ ...a, phase })))];
         if (allAbilities.length > 0) {
-          lines.push('  Abilities:');
+          lines.push('ABILITIES:');
+          lines.push('');
           allAbilities.forEach(a => {
-            lines.push(`    • ${a.name} (${a.phase} · ${a.type})`);
-            lines.push(`      ${a.description}`);
+            lines.push(`◆ ${a.name}`);
+            lines.push(`  WHEN: ${a.phase}${a.phase === 'Any Phase' ? ' (Movement, Assault, Combat, or Scoring)' : ''}`);
+            lines.push(`  TYPE: ${a.type}${a.type === 'Active' ? ' (use during this unit\'s activation)' : a.type === 'Passive' ? ' (always active)' : ' (declare when triggered)'}`);
+            if (a.cost) {
+              lines.push(`  COST: ${a.cost}`);
+              lines.push(`    └─ Exhaust cards producing this much resource to use`);
+            } else {
+              lines.push(`  COST: Free`);
+            }
+            lines.push(`  ${'─'.repeat(55)}`);
+            lines.push(`  ${a.description}`);
+            lines.push('');
           });
         }
         
-        // Selected Upgrades
+        // Upgrades
         if (selectedUpgrades.length > 0) {
-          lines.push('  Selected Upgrades:');
+          lines.push('SELECTED UPGRADES:');
+          lines.push('');
           selectedUpgrades.forEach(u => {
-            lines.push(`    ✓ ${u.name} (${u.phase} · ${u.cost} pts · ${u.type})`);
-            lines.push(`      ${u.description}`);
+            lines.push(`✓ ${u.name} (+${u.cost} pts)`);
+            lines.push(`  WHEN: ${u.phase}`);
+            lines.push(`  TYPE: ${u.type}`);
+            lines.push(`  ${u.description}`);
+            lines.push('');
           });
         }
         
@@ -713,22 +938,31 @@ function App() {
       });
     }
     
-    // Summary
-    lines.push('── SUMMARY ──');
-    lines.push(`Spent: ${minerals} Minerals | ${gas} Gas`);
+    // Footer
+    lines.push(divider);
+    lines.push(`  ARMY TOTAL: ${minerals} Minerals · ${gas} Gas · Supply ${supply}`);
     if (selectedScale.id !== 'grand') {
-      lines.push(`Remaining: ${mineralsRemaining} Minerals | ${gasRemaining} Gas`);
+      lines.push(`  REMAINING: ${mineralsRemaining} Minerals · ${gasRemaining} Gas`);
     }
-    lines.push(`Total Supply: ${supply}`);
+    lines.push(divider);
     
-    setExportText(lines.join('\n'));
+    return lines.join('\n');
   }, [armyUnits, armyTactical, selectedFaction, selectedScale, minerals, gas, mineralsRemaining, gasRemaining, supply]);
+  
+  const handleExport = useCallback((mode) => {
+    if (mode === 'quick') {
+      setExportText(generateQuickExport());
+    } else {
+      setExportText(generateFullExport());
+    }
+    setShowExportChoice(false);
+  }, [generateQuickExport, generateFullExport]);
 
   const unitIdsInArmy = armyUnits.map(u => u.unit.id);
   const tacticalIdsInArmy = armyTactical.map(t => t.id);
 
   return (
-    <div className="app"><a href="index.html" className="home-btn" title="Home">←</a>
+    <div className="app">
       <style>{`
         :root { --bg:#1a1a1a; --panel:#242424; --panel-2:#2a2a2a; --panel-3:#303030; --text:#f0eee8; --muted:#a8a299; --border:#3a3a3a; --accent:#3b82f6; --terran-accent:#1d4ed8; --success:#22c55e; --warning:#eab308; --error:#ef4444; --gas:#22d3ee; --radius:16px; --radius-sm:10px; --role-hero:#f59e0b; --role-elite:#a855f7; --role-core:#3b82f6; --role-support:#22c55e; --role-other:#6b7280; --tactical:#06b6d4; --glossary:#ec4899; }
         * { box-sizing:border-box; margin:0; padding:0; }
@@ -741,6 +975,28 @@ function App() {
         .faction-options { display:flex; gap:8px; }
         .faction-option { flex:1; padding:10px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--panel-2); color:var(--muted); font-size:0.85rem; font-weight:600; cursor:pointer; text-align:center; transition:all 0.15s; }
         .faction-option.active { border-color:var(--terran-accent); color:var(--text); background:rgba(29,78,216,0.15); }
+        
+        .faction-card-display { margin-top:12px; background:var(--panel-2); border:1px solid var(--terran-accent); border-radius:var(--radius); overflow:hidden; }
+        .faction-card-header { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
+        .faction-card-name { font-size:1rem; font-weight:700; }
+        .faction-card-badges { display:flex; gap:6px; align-items:center; }
+        .resource-badge { padding:3px 8px; border-radius:4px; font-size:0.7rem; font-weight:700; background:rgba(29,78,216,0.2); color:var(--terran-accent); }
+        .faction-card-slots { display:flex; flex-wrap:wrap; gap:6px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--bg); justify-content:center; }
+        .faction-slot-badge { padding:3px 8px; border-radius:4px; font-size:0.65rem; font-weight:600; text-transform:uppercase; }
+        .faction-slot-badge.hero { background:rgba(245,158,11,0.15); color:#f59e0b; }
+        .faction-slot-badge.elite { background:rgba(168,85,247,0.15); color:#a855f7; }
+        .faction-slot-badge.core { background:rgba(59,130,246,0.15); color:#3b82f6; }
+        .faction-slot-badge.support { background:rgba(34,197,94,0.15); color:#22c55e; }
+        .faction-card-abilities { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+        .faction-ability { padding:10px 12px; background:var(--bg); border-radius:8px; border-left:3px solid var(--border); }
+        .faction-ability-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
+        .faction-ability-name { font-size:0.85rem; font-weight:700; }
+        .faction-ability-phase { font-size:0.6rem; padding:2px 6px; border-radius:3px; background:var(--panel); color:var(--muted); font-weight:600; text-transform:uppercase; }
+        .faction-ability-type { font-size:0.6rem; padding:2px 6px; border-radius:3px; font-weight:700; text-transform:uppercase; }
+        .faction-ability-type.active { background:rgba(59,130,246,0.2); color:#3b82f6; }
+        .faction-ability-type.passive { background:rgba(34,197,94,0.2); color:#22c55e; }
+        .faction-ability-type.reaction { background:rgba(249,115,22,0.2); color:#f97316; }
+        .faction-ability-desc { font-size:0.8rem; color:var(--muted); line-height:1.5; }
         .scale-options { display:flex; gap:6px; }
         .scale-option { flex:1; padding:8px 6px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--panel-2); color:var(--muted); font-size:0.75rem; font-weight:600; cursor:pointer; text-align:center; transition:all 0.15s; display:flex; flex-direction:column; gap:2px; }
         .scale-option.active { border-color:var(--accent); color:var(--text); background:rgba(59,130,246,0.15); }
@@ -768,7 +1024,7 @@ function App() {
         .army-stat-value.minerals { color:var(--warning); }
         .army-stat-value.gas { color:var(--gas); }
         
-        .army-slots { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+        .army-slots { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; justify-content:center; }
         .slot-badge { font-size:0.7rem; padding:3px 8px; border-radius:999px; font-weight:600; }
         .slot-badge.ok { background:rgba(34,197,94,0.2); color:var(--success); }
         .slot-badge.over { background:rgba(239,68,68,0.2); color:var(--error); }
@@ -932,6 +1188,10 @@ function App() {
         .modal-title { font-weight:700; font-size:1.1rem; }
         .modal-type { font-size:0.8rem; color:var(--muted); margin-top:2px; }
         .modal-close { width:32px; height:32px; border-radius:50%; border:none; background:var(--panel-2); color:var(--muted); font-size:18px; cursor:pointer; display:grid; place-items:center; }
+        .export-choice-btn { width:100%; padding:14px 16px; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; text-align:left; transition:all 0.15s; }
+        .export-choice-btn:hover { border-color:var(--terran-accent); background:rgba(29,78,216,0.1); }
+        .export-choice-title { font-size:1rem; font-weight:700; color:var(--text); margin-bottom:4px; }
+        .export-choice-desc { font-size:0.8rem; color:var(--muted); line-height:1.4; }
         .modal-body { padding:16px; font-size:0.9rem; line-height:1.6; }
         .tier-option { padding:14px; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; cursor:pointer; transition:all 0.15s; }
         .tier-option:hover { border-color:var(--accent); }
@@ -943,23 +1203,13 @@ function App() {
         .empty-state-text { font-size:0.85rem; }
       `}</style>
 
-      {/* Faction & Scale Selector */}
+      {/* Battle Size Selector */}
       <Collapsible
         className="group-card"
         defaultOpen={true}
-        header={<div className="group-header"><div><div className="group-title">Setup</div><div className="group-subtitle">{selectedFaction?.name} · {selectedScale?.name}</div></div><span className="chevron">›</span></div>}
+        header={<div className="group-header"><div><div className="group-title">Setup</div><div className="group-subtitle">{selectedScale?.name}</div></div><span className="chevron">›</span></div>}
       >
         <div className="group-body" style={{ gap: 12 }}>
-          <div className="selector-group">
-            <div className="faction-label">Faction Card</div>
-            <div className="faction-options">
-              {TERRAN_FACTION_CARDS.map(f => (
-                <button key={f.id} className={`faction-option ${selectedFaction?.id === f.id ? 'active' : ''}`} onClick={() => setSelectedFaction(f)}>
-                  {f.name.replace("Raynor's ", '').replace("Terran ", '')}
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="selector-group">
             <div className="faction-label">Battle Size</div>
             <div className="scale-options">
@@ -1008,7 +1258,7 @@ function App() {
               })}
             </div>
             <div className="army-actions">
-              <button className="army-btn" onClick={handleExport}>Export</button>
+              <button className="army-btn" onClick={() => setShowExportChoice(true)}>Export</button>
               <button className="army-btn danger" onClick={() => setShowClearConfirm(true)}>Clear</button>
             </div>
           </div>
@@ -1052,6 +1302,51 @@ function App() {
         <span className="library-divider-text">Card Library</span>
         <div className="library-divider-line"></div>
       </div>
+
+      {/* Faction Cards */}
+      <Collapsible 
+        className="group-card" 
+        defaultOpen={false}
+        header={<div className="group-header"><div><div className="group-title">Faction Cards</div><div className="group-subtitle">{TERRAN_FACTION_CARDS.length} available</div></div><span className="chevron">›</span></div>}
+      >
+        <div className="group-body">
+          <div className="faction-options" style={{ marginBottom: 12 }}>
+            {TERRAN_FACTION_CARDS.map(f => (
+              <button key={f.id} className={`faction-option ${selectedFaction?.id === f.id ? 'active' : ''}`} onClick={() => setSelectedFaction(f)}>
+                {f.name.replace("Raynor's ", '').replace("Terran ", '')}
+              </button>
+            ))}
+          </div>
+          {selectedFaction && (
+            <div className="faction-card-display">
+              <div className="faction-card-header">
+                <div className="faction-card-name">{selectedFaction.name}</div>
+                <div className="faction-card-badges">
+                  <span className="resource-badge">{selectedFaction.resource}</span>
+                </div>
+              </div>
+              <div className="faction-card-slots">
+                {selectedFaction.slots.hero && <span className="faction-slot-badge hero">Hero ×{selectedFaction.slots.hero}</span>}
+                {selectedFaction.slots.elite && <span className="faction-slot-badge elite">Elite ×{selectedFaction.slots.elite}</span>}
+                {selectedFaction.slots.core && <span className="faction-slot-badge core">Core ×{selectedFaction.slots.core}</span>}
+                {selectedFaction.slots.support && <span className="faction-slot-badge support">Support ×{selectedFaction.slots.support}</span>}
+              </div>
+              <div className="faction-card-abilities">
+                {selectedFaction.abilities?.map((ab, i) => (
+                  <div key={i} className="faction-ability">
+                    <div className="faction-ability-header">
+                      <span className="faction-ability-name">{ab.name}</span>
+                      <span className="faction-ability-phase">{ab.phase}</span>
+                      <span className={`faction-ability-type ${ab.type.toLowerCase()}`}>{ab.type}</span>
+                    </div>
+                    <div className="faction-ability-desc">{ab.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Collapsible>
 
       {/* Units Browser */}
       <Collapsible 
@@ -1145,6 +1440,26 @@ function App() {
       {/* Modals */}
       {keywordModal && <KeywordModal keyword={keywordModal} onClose={() => setKeywordModal(null)} />}
       {tierPicker && <TierPickerModal unit={tierPicker} onSelect={handleSelectTier} onClose={() => setTierPicker(null)} />}
+      {showExportChoice && (
+        <div className="modal-overlay" onClick={() => setShowExportChoice(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div><div className="modal-title">Export Army</div><div className="modal-type">Choose export format</div></div>
+              <button className="modal-close" onClick={() => setShowExportChoice(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="export-choice-btn" onClick={() => handleExport('quick')}>
+                <div className="export-choice-title">📋 Quick Reference</div>
+                <div className="export-choice-desc">Compact cheat sheet for experienced players. Stats and abilities at a glance.</div>
+              </button>
+              <button className="export-choice-btn" onClick={() => handleExport('full')}>
+                <div className="export-choice-title">📖 Full Guide</div>
+                <div className="export-choice-desc">Complete guide that explains everything. Hand it to a new player and they can play.</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showClearConfirm && (
         <div className="modal-overlay" onClick={() => setShowClearConfirm(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
