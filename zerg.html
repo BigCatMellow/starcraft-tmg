@@ -1202,14 +1202,42 @@
       100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
     }
   </style>
+
+<style id="app-nav-menu-style">
+  .app-menu-btn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:10000;width:44px;height:44px;border:none;border-radius:12px;background:rgba(36,36,36,.94);color:#f2f0e8;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.32), inset 0 0 0 1px rgba(255,255,255,.08);backdrop-filter:blur(8px);cursor:pointer} 
+  .app-menu-btn:hover{background:rgba(48,48,48,.98)}
+  .app-menu-btn:active{transform:translateY(1px)}
+  .app-menu-btn .bars,.app-menu-btn .bars::before,.app-menu-btn .bars::after{display:block;width:18px;height:2px;background:currentColor;border-radius:2px;content:"";position:relative} 
+  .app-menu-btn .bars::before{position:absolute;top:-6px;left:0} 
+  .app-menu-btn .bars::after{position:absolute;top:6px;left:0} 
+  .app-menu-overlay{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .18s ease} 
+  .app-menu-overlay.open{opacity:1;pointer-events:auto} 
+  .app-menu-sheet{position:absolute;top:0;left:0;height:100%;width:min(320px,84vw);background:#242424;color:#f2f0e8;box-shadow:12px 0 32px rgba(0,0,0,.38);transform:translateX(-100%);transition:transform .18s ease;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 16px 16px;display:flex;flex-direction:column;gap:14px} 
+  .app-menu-overlay.open .app-menu-sheet{transform:translateX(0)}
+  .app-menu-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 4px 8px 4px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .app-menu-title{font-size:1rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#f2f0e8}
+  .app-menu-close{width:36px;height:36px;border:none;border-radius:10px;background:#303030;color:#f2f0e8;font-size:1.1rem;cursor:pointer} 
+  .app-menu-links{display:grid;gap:10px;padding-top:4px} 
+  .app-menu-link{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 14px;border-radius:14px;background:#2a2a2a;color:#f2f0e8;text-decoration:none;font-weight:700;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+  .app-menu-link small{display:block;font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#c8c6bd;margin-top:2px}
+  .app-menu-link.current{outline:2px solid rgba(138,162,200,.7)}
+  .app-menu-link[data-accent="zerg"]{box-shadow:inset 0 0 0 1px rgba(110,58,165,.55)}
+  .app-menu-link[data-accent="protoss"]{box-shadow:inset 0 0 0 1px rgba(212,175,55,.55)}
+  .app-menu-link[data-accent="terran"]{box-shadow:inset 0 0 0 1px rgba(47,109,179,.55)}
+  .app-menu-link[data-accent="rules"]{box-shadow:inset 0 0 0 1px rgba(120,120,120,.55)}
+  .app-menu-link[data-accent="missions"]{box-shadow:inset 0 0 0 1px rgba(88,140,110,.55)}
+  .app-menu-link[data-accent="home"]{box-shadow:inset 0 0 0 1px rgba(138,162,200,.55)}
+  body.app-menu-open{overflow:hidden} 
+  @media (min-width: 768px){ .app-menu-btn{left:16px;top:16px} }
+</style>
 </head>
 <body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
-  <script type="text/babel">
+  <div class="app" id="app"></div>
+  
+  <!-- Tab Bar -->
+  <div class="tab-bar" id="tabBar"></div>
 
+  <script>
     // ============================================================================
     // DATA: Keywords Glossary
     // ============================================================================
@@ -2426,25 +2454,49 @@
     // ============================================================================
 
     // ============================================================================
-    // REACT BOOTSTRAP
+    // INIT
     // ============================================================================
-
-    function ZergBuilderApp() {
-      React.useEffect(() => {
-        load();
-        render();
-      }, []);
-      return (
-        <>
-          <div className="app" id="app"></div>
-          <div className="tab-bar" id="tabBar"></div>
-        </>
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<ZergBuilderApp />);
-  
+    load();
+    render();
   </script>
+
+<script id="app-nav-menu-script">
+(function(){
+  function initAppMenu(){
+    if(document.getElementById('app-menu-overlay')) return;
+    var page=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+    var links=[
+      ['Home','Main launcher','index.html','home'],
+      ['Zerg','Army builder','zerg.html','zerg'],
+      ['Protoss','Army builder','protoss.html','protoss'],
+      ['Terran','Army builder','terran.html','terran'],
+      ['Missions','Scenario setup','missions.html','missions'],
+      ['Rules','Reference','rules.html','rules']
+    ];
+    var btn=document.createElement('button');
+    btn.className='app-menu-btn';
+    btn.setAttribute('aria-label','Open navigation menu');
+    btn.innerHTML='<span class="bars" aria-hidden="true"></span>';
+    var overlay=document.createElement('div');
+    overlay.className='app-menu-overlay';
+    overlay.id='app-menu-overlay';
+    var linkHtml=links.map(function(item){
+      var current=page===item[2].toLowerCase() ? ' current' : '';
+      return '<a class="app-menu-link'+current+'" data-accent="'+item[3]+'" href="'+item[2]+'"><span>'+item[0]+'<small>'+item[1]+'</small></span><span aria-hidden="true">›</span></a>';
+    }).join('');
+    overlay.innerHTML='<div class="app-menu-sheet" role="dialog" aria-modal="true" aria-label="Navigation menu">'+
+      '<div class="app-menu-header"><div class="app-menu-title">Navigate</div><button class="app-menu-close" type="button" aria-label="Close navigation menu">✕</button></div>'+
+      '<div class="app-menu-links">'+linkHtml+'</div></div>';
+    function openMenu(){ overlay.classList.add('open'); document.body.classList.add('app-menu-open'); }
+    function closeMenu(){ overlay.classList.remove('open'); document.body.classList.remove('app-menu-open'); }
+    btn.addEventListener('click', openMenu);
+    overlay.addEventListener('click', function(e){ if(e.target===overlay || e.target.classList.contains('app-menu-close')) closeMenu(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeMenu(); });
+    document.body.appendChild(btn);
+    document.body.appendChild(overlay);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initAppMenu); else initAppMenu();
+})();
+</script>
 </body>
 </html>
