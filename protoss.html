@@ -20,14 +20,14 @@
       --success: #22c55e;
       --warning: #fbbf24;
       --error: #ef4444;
-      --gas: #8be9fd;
+      --gas: #22d3ee;
       --role-hero: #f59e0b;
-      --role-elite: #8b5cf6;
-      --role-core: #60a5fa;
-      --role-support: #2dd4bf;
+      --role-elite: #a855f7;
+      --role-core: #3b82f6;
+      --role-support: #22c55e;
       --role-other: #6b7280;
-      --tactical: #c084fc;
-      --glossary: #f472b6;
+      --tactical: #06b6d4;
+      --glossary: #ec4899;
     }
     
     body {
@@ -288,7 +288,7 @@
 
     /* Army Card - Expandable */
     .army-card {
-      background: linear-gradient(135deg, #1f2436 0%, var(--panel-2) 100%);
+      background: linear-gradient(135deg, #282838 0%, var(--panel-2) 100%);
       border: 1px solid var(--border);
       border-radius: 10px;
       margin-bottom: 8px;
@@ -1235,6 +1235,29 @@
   'TOUGH': { type: 'Combat', description: 'When making Armour Rolls, convert up to X failed results into successes.' },
 };
 
+    const TAGS = {
+      'Armoured': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Armoured deal bonus damage that bypasses armour when attacking this unit.' },
+      'Biological': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Biological deal bonus damage that bypasses armour when attacking this unit.' },
+      'Flying': { type: 'Combat Tag', description: 'Flying units are never Engaged and cannot Engage. They cannot Charge or be Charged. They ignore terrain and Gap Clearance during movement. They do not participate in the Combat Phase. They cannot Contest or Control Mission Markers. They never benefit from High Ground Cover. Must end movement at least 1" from enemy Flying units.' },
+      'Ground': { type: 'Combat Tag', description: 'Ground units can Engage other Ground units when Within 1". Weapons with Target: Ground can only hit units with this tag. Ground units participate in the Combat Phase when Engaged.' },
+      'Light': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Light deal bonus damage that bypasses armour when attacking this unit.' },
+      'Mechanical': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Mechanical deal bonus damage that bypasses armour when attacking this unit.' },
+      'Psionic': { type: 'Special Tag', description: 'This unit has psychic abilities. Used as a marker for ability targeting - certain abilities specifically affect or reference Psionic units. Does not affect Surge damage.' },
+      'Unique': { type: 'Special Tag', description: 'Only one of this unit may be included in your army list.' },
+    };
+
+    const SURGE_TAGS = ['Armoured', 'Biological', 'Light', 'Mechanical'];
+    const TYPE_TAGS = ['Ground', 'Flying'];
+
+    // ============================================================================
+    // DATA: Engagement Scales
+    // ============================================================================
+    const ENGAGEMENT_SCALES = [
+      { id: 'skirmish', name: 'Skirmish', minerals: 1000, gas: 100, table: '36" x 36"' },
+      { id: 'standard', name: 'Standard', minerals: 2000, gas: 200, table: '36" x 54"' },
+      { id: 'grand', name: 'Grand', minerals: 9999, gas: 999, table: '36" x 72"' },
+    ];
+
     // ============================================================================
     // DATA: Faction Cards
     // ============================================================================
@@ -1450,6 +1473,28 @@
 ];
 
     // ============================================================================
+    // STATE
+    // ============================================================================
+    let state = {
+      selectedScale: ENGAGEMENT_SCALES[1],
+      selectedFaction: ZERG_FACTION_CARDS[0],
+      armyUnits: [],
+      armyTactical: [],
+      activeTab: 'army', // 'army', 'units', 'tactical', 'factions', 'glossary'
+      expandedArmyCards: {},
+      expandedRoleGroups: {}, // Track which role groups are expanded
+      expandedLibraryCards: {},
+      openSections: {},
+      keywordModal: null,
+      tierPicker: null,
+      showExportChoice: false,
+      showClearConfirm: false,
+      exportText: null,
+      justAddedId: null,
+      glossarySearch: '',
+    };
+
+    // ============================================================================
     // HELPERS
     // ============================================================================
     function highlightKeywords(text) {
@@ -1522,13 +1567,13 @@
           factionId: state.selectedFaction?.id,
           scaleId: state.selectedScale?.id
         };
-        localStorage.setItem('sc-tmg-protoss-v1', JSON.stringify(toSave));
+        localStorage.setItem('sc-tmg-zerg-v4', JSON.stringify(toSave));
       } catch (e) { console.error(e); }
     }
 
     function load() {
       try {
-        const saved = localStorage.getItem('sc-tmg-protoss-v1');
+        const saved = localStorage.getItem('sc-tmg-zerg-v4');
         if (saved) {
           const { units, tactical, factionId, scaleId } = JSON.parse(saved);
           const rehydratedUnits = (units || []).map(entry => {
@@ -1719,7 +1764,7 @@
       const thinDivider = '-'.repeat(50);
 
       lines.push(divider);
-      lines.push('  ' + (state.selectedFaction?.name?.toUpperCase() || 'PROTOSS') + ' - ' + state.selectedScale.name);
+      lines.push('  ' + (state.selectedFaction?.name?.toUpperCase() || 'ZERG') + ' - ' + state.selectedScale.name);
       lines.push(divider);
       lines.push('');
 
@@ -1883,7 +1928,7 @@
             state.armyTactical.forEach((card, idx) => {
               html += '<div class="army-card" style="border-left: 3px solid var(--tactical);">';
               html += '<div class="army-card-header" onclick="toggleArmyCard(\'tac-' + idx + '\')">';
-              html += '<div class="army-card-info"><h3>' + card.name + (card.unique ? ' <span class="unique-badge">Unique</span>' : '') + '</h3><div class="army-card-meta">' + (card.resource || 'Tactical Card') + '</div></div>';
+              html += '<div class="army-card-info"><h3>' + card.name + (card.unique ? ' <span class="unique-badge">Unique</span>' : '') + '</h3><div class="army-card-meta">' + (card.resource || 'Creep Card') + '</div></div>';
               html += '<div class="army-card-right"><div class="army-card-cost" style="color: var(--gas);">' + card.cost + ' Gas</div><span class="army-card-chevron">' + (state.expandedArmyCards['tac-' + idx] ? '&#9662;' : '&#8250;') + '</span></div>';
               html += '</div>';
               if (state.expandedArmyCards['tac-' + idx]) {
@@ -2123,9 +2168,9 @@
       html += '<div class="tab-header"><div class="tab-title">Tactical Cards</div></div>';
       
       const tacticalCategories = [
-        { id: 'combat', name: 'Combat', desc: 'Weapon and armor support' },
-        { id: 'defense', name: 'Defense', desc: 'Damage mitigation and survivability' },
-        { id: 'positioning', name: 'Positioning', desc: 'Warping, recall, deployment, and support' }
+        { id: 'creep', name: 'Creep', desc: 'Spread and buff creep mechanics' },
+        { id: 'combat', name: 'Combat', desc: 'Improve attacks and defense' },
+        { id: 'positioning', name: 'Positioning', desc: 'Deployment, ambush, detection' }
       ];
       
       const renderTacticalCard = (card) => {

@@ -1204,12 +1204,12 @@
   </style>
 </head>
 <body>
-  <div class="app" id="app"></div>
-  
-  <!-- Tab Bar -->
-  <div class="tab-bar" id="tabBar"></div>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+  <script type="text/babel">
 
-  <script>
     // ============================================================================
     // DATA: Keywords Glossary
     // ============================================================================
@@ -2426,10 +2426,25 @@
     // ============================================================================
 
     // ============================================================================
-    // INIT
+    // REACT BOOTSTRAP
     // ============================================================================
-    load();
-    render();
+
+    function ZergBuilderApp() {
+      React.useEffect(() => {
+        load();
+        render();
+      }, []);
+      return (
+        <>
+          <div className="app" id="app"></div>
+          <div className="tab-bar" id="tabBar"></div>
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<ZergBuilderApp />);
+  
   </script>
 </body>
 </html>
