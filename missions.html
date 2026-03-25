@@ -2,30 +2,196 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#1a1a1a">
-  <title>Missions & Maps - StarCraft: TMG</title>
-  <link rel="manifest" href="manifest.json">
-<style>
-.home-btn { position: fixed; top: 12px; left: 12px; width: 40px; height: 40px; border-radius: 10px; background: #242424; border: 1px solid #3a3a3a; color: #f0eee8; font-size: 1.2rem; display: grid; place-items: center; cursor: pointer; z-index: 100; text-decoration: none; }
-.home-btn:hover { background: #2a2a2a; border-color: #eab308; }
-</style>
+  <title>Missions & Maps - StarCraft TMG</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #1a1a1a;
+      --panel: #242424;
+      --panel-2: #2a2a2a;
+      --panel-3: #303030;
+      --text: #f0eee8;
+      --muted: #a8a299;
+      --border: #3a3a3a;
+      --accent: #eab308;
+      --mission: #f97316;
+      --map: #06b6d4;
+      --standard: #a855f7;
+      --skirmish: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 10px 24px rgba(0,0,0,0.28);
+    }
+    html, body { background: var(--bg); color: var(--text); }
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; min-height: 100dvh; line-height: 1.45;
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: calc(88px + env(safe-area-inset-bottom));
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; }
+    .app { max-width: 480px; margin: 0 auto; padding: 12px; }
+    .header { text-align:center; padding:16px 6px 12px; border-bottom:2px solid var(--accent); margin-bottom: 10px; }
+    .eyebrow { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; font-weight:800; margin-bottom:6px; }
+    .title { font-size:1.4rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; line-height:1.1; }
+    .title span { color:var(--accent); }
+    .subtitle { margin-top:6px; color:var(--muted); font-size:.82rem; }
+    .sticky-top { position: sticky; top:0; z-index:100; background: rgba(26,26,26,.96); backdrop-filter: blur(10px); margin:0 -12px 14px; padding:10px 12px 12px; border-bottom:1px solid var(--border); }
+    .size-switch { display:flex; background:var(--panel); border:1px solid var(--border); border-radius: 10px; padding:3px; gap:3px; margin-bottom:10px; }
+    .size-btn { flex:1; border:none; border-radius:8px; background:transparent; color:var(--muted); padding:10px 8px; font-size:.84rem; font-weight:800; cursor:pointer; }
+    .size-btn.active { background: var(--accent); color:#111; }
+    .summary-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+    .summary-card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:9px 8px; text-align:center; }
+    .summary-label { color:var(--muted); font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; margin-bottom:2px; }
+    .summary-value { font-size:1rem; font-weight:800; }
+    .section { margin-bottom:16px; }
+    .section-head { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 2px; margin-bottom:6px; }
+    .section-title { font-size:.76rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:800; }
+    .section-note { font-size:.68rem; color:var(--muted); }
+    .group-card, .setup-card, .library-card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow: var(--shadow); overflow:hidden; margin-bottom:12px; }
+    .group-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; cursor:pointer; user-select:none; gap:10px; }
+    .group-title { font-size:1.04rem; font-weight:800; }
+    .group-subtitle { font-size:.78rem; color:var(--muted); margin-top:2px; }
+    .group-body { padding: 0 12px 12px; }
+    .chev { color:var(--muted); font-size:18px; transition: transform .18s; flex-shrink:0; }
+    .open > .group-header .chev, .card.open .chev { transform: rotate(90deg); }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .btn { border:1px solid var(--border); background:var(--panel-2); color:var(--text); border-radius:8px; padding:8px 12px; font-size:.78rem; font-weight:700; cursor:pointer; }
+    .btn.accent { color:var(--accent); border-color:var(--accent); }
+    .btn.map { color:var(--map); border-color:var(--map); }
+    .btn.danger { color:#f87171; border-color:#ef4444; }
+    .selected-slot { background:var(--panel-2); border:1px dashed var(--border); border-radius:12px; padding:14px; margin-bottom:12px; }
+    .selected-slot.filled { border-style:solid; border-color:var(--accent); background:rgba(234,179,8,.06); }
+    .slot-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+    .slot-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:800; }
+    .slot-empty { color:var(--muted); font-size:.84rem; font-style:italic; }
+    .setup-head { display:flex; align-items:center; gap:10px; padding:14px; cursor:pointer; user-select:none; background:rgba(234,179,8,.07); }
+    .setup-type { font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--accent); background:rgba(234,179,8,.15); padding:3px 8px; border-radius:5px; }
+    .setup-name { font-size:1rem; font-weight:800; }
+    .setup-meta { font-size:.76rem; color:var(--muted); margin-top:2px; }
+    .setup-head .spacer { flex:1; }
+    .tiny-btn { border:1px solid var(--border); background:var(--panel-2); color:var(--muted); border-radius:6px; padding:6px 10px; font-size:.75rem; font-weight:700; cursor:pointer; }
+    .tiny-btn.random { color:var(--accent); border-color:var(--accent); }
+    .tiny-btn.remove { color:#f87171; border-color:#ef4444; }
+    .setup-body { padding: 0 14px 14px; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-bottom:8px; box-shadow: var(--shadow); }
+    .card.mission { border-left:3px solid var(--mission); }
+    .card.map { border-left:3px solid var(--map); }
+    .card-head { display:flex; align-items:center; gap:12px; padding:14px; cursor:pointer; user-select:none; }
+    .card-main { flex:1; min-width:0; }
+    .card-name { font-size:1rem; font-weight:800; }
+    .card-meta { font-size:.75rem; color:var(--muted); margin-top:2px; }
+    .stats { display:flex; gap:8px; flex-shrink:0; }
+    .stat-pill { display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:52px; padding:6px 8px; background:var(--panel-2); border-radius:8px; font-size:.92rem; font-weight:800; }
+    .stat-pill span { font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+    .pick { width:24px; height:24px; border:2px solid var(--border); border-radius:999px; display:grid; place-items:center; flex-shrink:0; background:transparent; }
+    .pick::after { content:'✓'; font-size:12px; font-weight:800; color:transparent; }
+    .card.selected .pick { border-color:var(--accent); background:var(--accent); }
+    .card.selected .pick::after { color:#111; }
+    .card-body { padding:0 14px 14px; }
+    .info-box { background:var(--panel-2); border-radius:10px; padding:10px 12px; margin-bottom:10px; }
+    .info-title { font-size:.68rem; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; font-weight:800; margin-bottom:8px; }
+    .rule { font-size:.84rem; line-height:1.5; margin-bottom:6px; padding-left:12px; position:relative; }
+    .rule:last-child { margin-bottom:0; }
+    .rule::before { content:'•'; position:absolute; left:0; color:var(--muted); }
+    .ability-name { font-size:.88rem; font-weight:700; }
+    .ability-name span { color:var(--muted); font-weight:500; font-size:.8rem; }
+    .ability-desc { font-size:.84rem; margin-top:4px; line-height:1.48; }
+    .special { border:1px solid rgba(234,179,8,.3); background:rgba(234,179,8,.1); }
+    .map-svg { width:100%; height:auto; display:block; border-radius:10px; margin-bottom:10px; background:var(--panel-2); }
+    .legend, .marker-box { background:var(--panel-2); border-radius:10px; padding:10px 12px; margin-bottom:10px; }
+    .legend { display:flex; flex-wrap:wrap; gap:12px; }
+    .legend-item { display:flex; align-items:center; gap:6px; font-size:.75rem; color:var(--muted); }
+    .legend-color { width:16px; height:12px; border-radius:3px; }
+    .legend-color.red { background:rgba(239,68,68,.3); border:1px solid var(--red); }
+    .legend-color.blue { background:rgba(59,130,246,.3); border:1px solid var(--blue); }
+    .legend-circle { width:18px; height:18px; border-radius:50%; border:1.5px solid var(--text); display:grid; place-items:center; font-size:.65rem; font-weight:800; }
+    .setup-section { background:var(--panel-2); border-radius:10px; padding:12px; margin-bottom:10px; }
+    .setup-section.red { border-left:3px solid var(--red); }
+    .setup-section.blue { border-left:3px solid var(--blue); }
+    .setup-title { font-size:.84rem; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+    .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .dot.red { background:var(--red); }
+    .dot.blue { background:var(--blue); }
+    .setup-step { font-size:.8rem; line-height:1.5; margin-bottom:7px; padding-left:14px; position:relative; }
+    .setup-step:last-child { margin-bottom:0; }
+    .setup-step::before { content:'•'; position:absolute; left:0; color:var(--muted); }
+    .marker-title { font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:800; margin-bottom:8px; }
+    .marker-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:6px; }
+    .marker-row:last-child { margin-bottom:0; }
+    .badge { width:22px; height:22px; border-radius:50%; border:2px solid var(--text); display:grid; place-items:center; font-size:.74rem; font-weight:800; background:var(--panel-3); flex-shrink:0; }
+    .badge.center { background:var(--accent); border-color:var(--accent); color:#111; }
+    .marker-desc { font-size:.8rem; line-height:1.4; padding-top:2px; }
+    .notes { font-size:.8rem; color:var(--muted); font-style:italic; background:rgba(234,179,8,.08); border-left:2px solid var(--accent); border-radius:10px; padding:10px 12px; }
+    .bottom-nav { position:fixed; left:0; right:0; bottom:0; z-index:140; background:rgba(24,24,24,.98); backdrop-filter:blur(10px); border-top:1px solid var(--border); padding:8px 10px calc(8px + env(safe-area-inset-bottom)); }
+    .nav-grid { max-width:480px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .nav-btn { border:none; background:var(--panel); color:var(--muted); border-radius:12px; min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:.7rem; font-weight:700; cursor:pointer; }
+    .nav-btn.active { color:var(--text); border:1px solid var(--accent); background:rgba(234,179,8,.08); }
+    .nav-btn .icon { font-size:1rem; line-height:1; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); display:none; align-items:center; justify-content:center; z-index:200; padding:16px; }
+    .modal-overlay.open { display:flex; }
+    .modal { width:100%; max-width:440px; max-height:80vh; background:var(--panel); border:1px solid var(--border); border-radius:16px; display:flex; flex-direction:column; overflow:hidden; }
+    .modal-head { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .modal-title { font-size:1.04rem; font-weight:800; }
+    .modal-close { width:32px; height:32px; border:none; border-radius:50%; background:var(--panel-2); color:var(--text); font-size:1.2rem; cursor:pointer; }
+    .modal-body { padding:16px; overflow:auto; }
+    .export-area { width:100%; min-height:300px; background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:12px; color:var(--text); font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; resize:none; }
+    .hint { color:var(--muted); font-size:.75rem; text-align:center; margin-top:8px; }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
-  <script type="text/babel">
-const { useState, useEffect, useCallback } = React;
+  <div class="app">
+    <header class="header">
+      <div class="eyebrow">StarCraft TMG</div>
+      <div class="title">Missions <span>&</span> Maps</div>
+      <div class="subtitle">Builder-style battle setup for phone play</div>
+    </header>
 
+    <div class="sticky-top">
+      <div class="size-switch">
+        <button class="size-btn active" data-size="standard">Standard</button>
+        <button class="size-btn" data-size="skirmish">Skirmish</button>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-label">Minerals</div><div class="summary-value" id="sum-minerals">2000</div></div>
+        <div class="summary-card"><div class="summary-label">Gas</div><div class="summary-value" id="sum-gas">200</div></div>
+        <div class="summary-card"><div class="summary-label">Board</div><div class="summary-value" id="sum-board">54×36</div></div>
+      </div>
+    </div>
 
-// ============================================================================
-// DATA: Missions
-// ============================================================================
-const MISSIONS = [
+    <section id="panel-setup" class="tab-panel active"></section>
+    <section id="panel-missions" class="tab-panel"></section>
+    <section id="panel-maps" class="tab-panel"></section>
+    <section id="panel-ref" class="tab-panel"></section>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-grid">
+      <button class="nav-btn active" data-tab="setup"><span class="icon">⚙</span><span>Setup</span></button>
+      <button class="nav-btn" data-tab="missions"><span class="icon">🎯</span><span>Missions</span></button>
+      <button class="nav-btn" data-tab="maps"><span class="icon">🗺</span><span>Maps</span></button>
+      <button class="nav-btn" data-tab="ref"><span class="icon">📘</span><span>Reference</span></button>
+    </div>
+  </nav>
+
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal">
+      <div class="modal-head"><div class="modal-title">Export Battle Setup</div><button class="modal-close" id="closeModal">×</button></div>
+      <div class="modal-body"><textarea class="export-area" id="exportArea" readonly></textarea><div class="hint">Tap inside the text box to select and copy.</div></div>
+    </div>
+  </div>
+
+  <script>
+    const MISSIONS = [
   // Standard Missions
   {
     id: 'supply-drop',
@@ -207,11 +373,7 @@ const MISSIONS = [
     special: 'The game ends immediately if a Player leads by 8+ VPs.'
   }
 ];
-
-// ============================================================================
-// DATA: Maps
-// ============================================================================
-const MAPS = [
+    const MAPS = [
   // 36x36 Skirmish Maps
   {
     id: 'char-plains',
@@ -619,783 +781,160 @@ const MAPS = [
     notes: 'Pure left-edge versus right-edge deployment. Both players start in long vertical side strips with markers forming a box around the center.'
   }
 ];
+    const STORAGE_KEY = 'starcraft_tmg_missions_builder_state_v1';
+    const state = { battleSize: 'standard', selectedMissionId: null, selectedMapId: null, setupMissionOpen: false, setupMapOpen: false, activeTab: 'setup' };
 
-// ============================================================================
-// COMPONENTS
-// ============================================================================
-const Collapsible = ({ children, header, defaultOpen = false, className = '' }) => {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className={`${className} ${open ? 'open' : ''}`}>
-      <div onClick={() => setOpen(!open)}>{header}</div>
-      {open && children}
-    </div>
-  );
-};
-
-const MissionCard = ({ mission, selectable = false, selected = false, onSelect }) => {
-  const [open, setOpen] = useState(false);
-  const typeClass = mission.type === 'Skirmish' ? 'skirmish' : 'standard';
-  
-  const handleSelectClick = (e) => {
-    e.stopPropagation();
-    if (onSelect) onSelect();
-  };
-  
-  const handleCardClick = () => {
-    setOpen(!open);
-  };
-  
-  return (
-    <div className={`mission-card ${typeClass} ${selectable ? 'selectable' : ''} ${selected ? 'selected' : ''} ${open ? 'open' : ''}`}>
-      <div className="mission-header" onClick={handleCardClick}>
-        {selectable && (
-          <div className="select-box" onClick={handleSelectClick}>
-            <div className="select-indicator"></div>
-          </div>
-        )}
-        <div className="mission-title-row">
-          <div>
-            <div className="mission-name">{mission.name}</div>
-            <div className="mission-meta">{mission.type} · {mission.gameLength} Rounds</div>
-          </div>
-          <div className="mission-stats">
-            <span className="mission-stat"><span>Supply</span>{mission.supply}</span>
-            <span className="mission-stat"><span>Per Rnd</span>{mission.perRound}</span>
-          </div>
-        </div>
-        <span className="chevron">›</span>
-      </div>
-      {open && (
-        <div className="mission-body">
-          <div className="mission-section">
-            <div className="mission-section-title">Mission Parameters</div>
-            {mission.parameters.map((p, i) => <div key={i} className="mission-rule">{p}</div>)}
-          </div>
-          <div className="mission-section">
-            <div className="mission-section-title">Scoring Conditions</div>
-            {mission.scoring.map((s, i) => <div key={i} className="mission-rule">{s}</div>)}
-          </div>
-          {mission.additionalRules && (
-            <div className="mission-section">
-              <div className="mission-section-title">Additional Rules</div>
-              {mission.additionalRules.map((r, i) => (
-                <div key={i} className="mission-ability">
-                  <div className="mission-ability-name">{r.name} <span>({r.phase})</span></div>
-                  <div className="mission-ability-desc">{r.description}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mission-section special">
-            <div className="mission-section-title">Special Winning Condition</div>
-            <div className="mission-rule">{mission.special}</div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const MapDiagram = ({ map }) => {
-  const scale = 6; // pixels per inch
-  const w = map.width * scale;
-  const h = map.height * scale;
-  
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="map-svg">
-      {/* Background */}
-      <rect x="0" y="0" width={w} height={h} fill="var(--panel-2)" />
-      
-      {/* Grid lines */}
-      {[...Array(Math.floor(map.width / 6) + 1)].map((_, i) => (
-        <line key={`v${i}`} x1={i * 6 * scale} y1="0" x2={i * 6 * scale} y2={h} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="2,2" />
-      ))}
-      {[...Array(Math.floor(map.height / 6) + 1)].map((_, i) => (
-        <line key={`h${i}`} x1="0" y1={i * 6 * scale} x2={w} y2={i * 6 * scale} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="2,2" />
-      ))}
-      
-      {/* Red deployment zones */}
-      {map.redZones.map((zone, i) => (
-        <rect key={`r${i}`} x={zone.x * scale} y={zone.y * scale} width={zone.w * scale} height={zone.h * scale} fill="rgba(239, 68, 68, 0.3)" stroke="#ef4444" strokeWidth="1.5" />
-      ))}
-      
-      {/* Blue deployment zones */}
-      {map.blueZones.map((zone, i) => (
-        <rect key={`b${i}`} x={zone.x * scale} y={zone.y * scale} width={zone.w * scale} height={zone.h * scale} fill="rgba(59, 130, 246, 0.3)" stroke="#3b82f6" strokeWidth="1.5" />
-      ))}
-      
-      {/* Mission markers */}
-      {map.markers.map((marker) => (
-        <g key={marker.num}>
-          <circle cx={marker.x * scale} cy={marker.y * scale} r={12} fill={marker.num === 5 ? 'var(--accent)' : 'var(--panel-3)'} stroke="var(--text)" strokeWidth="2" />
-          <text x={marker.x * scale} y={marker.y * scale + 1} textAnchor="middle" dominantBaseline="middle" fill={marker.num === 5 ? '#000' : 'var(--text)'} fontSize="12" fontWeight="700">{marker.num}</text>
-        </g>
-      ))}
-      
-      {/* Border */}
-      <rect x="0" y="0" width={w} height={h} fill="none" stroke="var(--text)" strokeWidth="2" />
-    </svg>
-  );
-};
-
-const MapCard = ({ map, selectable = false, selected = false, onSelect }) => {
-  const [open, setOpen] = useState(false);
-  const typeClass = map.type === 'Skirmish' ? 'skirmish' : 'standard';
-  
-  const handleSelectClick = (e) => {
-    e.stopPropagation();
-    if (onSelect) onSelect();
-  };
-  
-  const handleCardClick = () => {
-    setOpen(!open);
-  };
-  
-  return (
-    <div className={`map-card ${typeClass} ${selectable ? 'selectable' : ''} ${selected ? 'selected' : ''} ${open ? 'open' : ''}`}>
-      <div className="map-header" onClick={handleCardClick}>
-        {selectable && (
-          <div className="select-box" onClick={handleSelectClick}>
-            <div className="select-indicator"></div>
-          </div>
-        )}
-        <div>
-          <div className="map-name">{map.name}</div>
-          <div className="map-meta">{map.type} · {map.size}</div>
-        </div>
-        <span className="chevron">›</span>
-      </div>
-      {open && (
-        <div className="map-body">
-          <MapDiagram map={map} />
-          <div className="map-legend">
-            <div className="legend-item"><span className="legend-box red"></span> Red Deployment</div>
-            <div className="legend-item"><span className="legend-box blue"></span> Blue Deployment</div>
-            <div className="legend-item"><span className="legend-marker">5</span> Objective Marker</div>
-          </div>
-          
-          {map.redSetup && (
-            <div className="setup-section red">
-              <div className="setup-title"><span className="setup-dot red"></span> Red Deployment: {map.redSetup.title}</div>
-              <div className="setup-instructions">
-                {map.redSetup.instructions.map((inst, i) => <div key={i} className="setup-step">{inst}</div>)}
-              </div>
-            </div>
-          )}
-          
-          {map.blueSetup && (
-            <div className="setup-section blue">
-              <div className="setup-title"><span className="setup-dot blue"></span> Blue Deployment: {map.blueSetup.title}</div>
-              <div className="setup-instructions">
-                {map.blueSetup.instructions.map((inst, i) => <div key={i} className="setup-step">{inst}</div>)}
-              </div>
-            </div>
-          )}
-          
-          {map.markerSetup && (
-            <div className="map-markers">
-              <div className="map-markers-title">Mission Markers</div>
-              <div className="marker-list">
-                {map.markerSetup.sort((a, b) => a.num - b.num).map(m => (
-                  <div key={m.num} className="marker-row">
-                    <span className={`marker-badge ${m.num === 5 ? 'center' : ''}`}>{m.num}</span>
-                    <span className="marker-desc">{m.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          <div className="map-notes">{map.notes}</div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ============================================================================
-// MAIN APP
-// ============================================================================
-function App() {
-  const [selectedMission, setSelectedMission] = useState(null);
-  const [selectedMap, setSelectedMap] = useState(null);
-  const [battleSize, setBattleSize] = useState('standard');
-  const [missionExpanded, setMissionExpanded] = useState(false);
-  const [mapExpanded, setMapExpanded] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  
-  const standardMissions = MISSIONS.filter(m => m.type === 'Standard');
-  const skirmishMissions = MISSIONS.filter(m => m.type === 'Skirmish');
-  const standardMaps = MAPS.filter(m => m.type === 'Standard');
-  const skirmishMaps = MAPS.filter(m => m.type === 'Skirmish');
-  
-  const activeMissions = battleSize === 'standard' ? standardMissions : skirmishMissions;
-  const activeMaps = battleSize === 'standard' ? standardMaps : skirmishMaps;
-  
-  const selectMission = (mission) => {
-    if (selectedMission?.id === mission.id) {
-      setSelectedMission(null);
-      setMissionExpanded(false);
-    } else {
-      setSelectedMission(mission);
+    function loadState() {
+      try { const raw = localStorage.getItem(STORAGE_KEY); if (!raw) return; Object.assign(state, JSON.parse(raw)); } catch (e) {}
     }
-  };
-  
-  const selectMap = (map) => {
-    if (selectedMap?.id === map.id) {
-      setSelectedMap(null);
-      setMapExpanded(false);
-    } else {
-      setSelectedMap(map);
+    function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    function activeMissions() { return MISSIONS.filter(m => m.type.toLowerCase() === state.battleSize); }
+    function activeMaps() { return MAPS.filter(m => m.type.toLowerCase() === state.battleSize); }
+    function selectedMission() { return MISSIONS.find(m => m.id === state.selectedMissionId) || null; }
+    function selectedMap() { return MAPS.find(m => m.id === state.selectedMapId) || null; }
+    function toggleTab(tab) { state.activeTab = tab; saveState(); render(); }
+    function setBattleSize(size) { state.battleSize = size; const m = selectedMission(); const mp = selectedMap(); if (m && m.type.toLowerCase() !== size) { state.selectedMissionId = null; state.setupMissionOpen = false; } if (mp && mp.type.toLowerCase() !== size) { state.selectedMapId = null; state.setupMapOpen = false; } saveState(); render(); }
+    function selectMission(id) { state.selectedMissionId = state.selectedMissionId === id ? null : id; if (!state.selectedMissionId) state.setupMissionOpen = false; saveState(); render(); }
+    function selectMap(id) { state.selectedMapId = state.selectedMapId === id ? null : id; if (!state.selectedMapId) state.setupMapOpen = false; saveState(); render(); }
+    function randomMission() { const pool = activeMissions().filter(m => m.id !== state.selectedMissionId); const pick = (pool.length ? pool : activeMissions())[Math.floor(Math.random() * activeMissions().length)]; if (pick) state.selectedMissionId = pick.id; state.setupMissionOpen = false; saveState(); render(); }
+    function randomMap() { const pool = activeMaps().filter(m => m.id !== state.selectedMapId); const source = pool.length ? pool : activeMaps(); const pick = source[Math.floor(Math.random() * source.length)]; if (pick) state.selectedMapId = pick.id; state.setupMapOpen = false; saveState(); render(); }
+    function randomBoth() { const ms = activeMissions(); const mp = activeMaps(); if (ms.length) state.selectedMissionId = ms[Math.floor(Math.random()*ms.length)].id; if (mp.length) state.selectedMapId = mp[Math.floor(Math.random()*mp.length)].id; state.setupMissionOpen = false; state.setupMapOpen = false; saveState(); render(); }
+    function clearSetup() { state.selectedMissionId = null; state.selectedMapId = null; state.setupMissionOpen = false; state.setupMapOpen = false; saveState(); render(); }
+    function toggleSetupMission() { state.setupMissionOpen = !state.setupMissionOpen; saveState(); render(); }
+    function toggleSetupMap() { state.setupMapOpen = !state.setupMapOpen; saveState(); render(); }
+    function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function renderRules(items) { return items.map(t => `<div class="rule">${escapeHtml(t)}</div>`).join(''); }
+    function renderMissionCard(m, inSetup=false, open=false) {
+      const selected = state.selectedMissionId === m.id;
+      return `<article class="card mission ${selected ? 'selected' : ''} ${open ? 'open' : ''}">
+        <div class="card-head" onclick="${inSetup ? 'toggleSetupMission()' : `toggleMissionOpen('${m.id}')`}">
+          ${!inSetup ? `<div class="pick" onclick="event.stopPropagation(); selectMission('${m.id}')"></div>` : `<span class="setup-type">Mission</span>`}
+          <div class="card-main"><div class="card-name">${escapeHtml(m.name)}</div><div class="card-meta">${escapeHtml(m.type)} · ${m.gameLength} Rounds</div></div>
+          <div class="stats"><div class="stat-pill"><span>Supply</span>${m.supply}</div><div class="stat-pill"><span>Per Rnd</span>${m.perRound}</div></div>
+          ${inSetup ? `<button class="tiny-btn random" onclick="event.stopPropagation(); randomMission()">🎲</button><button class="tiny-btn remove" onclick="event.stopPropagation(); state.selectedMissionId=null; state.setupMissionOpen=false; saveState(); render();">✕</button>` : ''}
+          <span class="chev">›</span></div>
+        ${open ? `<div class="card-body"><div class="info-box"><div class="info-title">Mission Parameters</div>${renderRules(m.parameters)}</div><div class="info-box"><div class="info-title">Scoring Conditions</div>${renderRules(m.scoring)}</div>${m.additionalRules ? `<div class="info-box"><div class="info-title">Additional Rules</div>${m.additionalRules.map(r=>`<div class="ability-name">${escapeHtml(r.name)} <span>(${escapeHtml(r.phase)})</span></div><div class="ability-desc">${escapeHtml(r.description)}</div>`).join('')}</div>` : ''}<div class="info-box special"><div class="info-title">Special Winning Condition</div><div class="rule">${escapeHtml(m.special)}</div></div></div>` : ''}
+      </article>`;
     }
-  };
-  
-  const randomMission = () => {
-    const pool = activeMissions.filter(m => m.id !== selectedMission?.id);
-    if (pool.length > 0) {
-      setSelectedMission(pool[Math.floor(Math.random() * pool.length)]);
-      setMissionExpanded(false);
+    function mapSvg(map) {
+      const scale=6, w=map.width*scale, h=map.height*scale;
+      const vLines = Array.from({length: Math.floor(map.width/6)+1}, (_,i)=>`<line x1="${i*6*scale}" y1="0" x2="${i*6*scale}" y2="${h}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,2"/>`).join('');
+      const hLines = Array.from({length: Math.floor(map.height/6)+1}, (_,i)=>`<line x1="0" y1="${i*6*scale}" x2="${w}" y2="${i*6*scale}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,2"/>`).join('');
+      const red = map.redZones.map(z=>`<rect x="${z.x*scale}" y="${z.y*scale}" width="${z.w*scale}" height="${z.h*scale}" fill="rgba(239,68,68,.3)" stroke="#ef4444" stroke-width="1.5"/>`).join('');
+      const blue = map.blueZones.map(z=>`<rect x="${z.x*scale}" y="${z.y*scale}" width="${z.w*scale}" height="${z.h*scale}" fill="rgba(59,130,246,.3)" stroke="#3b82f6" stroke-width="1.5"/>`).join('');
+      const markers = map.markers.map(m=>`<g><circle cx="${m.x*scale}" cy="${m.y*scale}" r="12" fill="${m.num===5 ? 'var(--accent)' : 'var(--panel-3)'}" stroke="var(--text)" stroke-width="2"/><text x="${m.x*scale}" y="${m.y*scale+1}" text-anchor="middle" dominant-baseline="middle" fill="${m.num===5 ? '#111' : 'var(--text)'}" font-size="12" font-weight="700">${m.num}</text></g>`).join('');
+      return `<svg viewBox="0 0 ${w} ${h}" class="map-svg"><rect x="0" y="0" width="${w}" height="${h}" fill="var(--panel-2)"/>${vLines}${hLines}${red}${blue}${markers}<rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="var(--text)" stroke-width="2"/></svg>`;
     }
-  };
-  
-  const randomMap = () => {
-    const pool = activeMaps.filter(m => m.id !== selectedMap?.id);
-    if (pool.length > 0) {
-      setSelectedMap(pool[Math.floor(Math.random() * pool.length)]);
-      setMapExpanded(false);
+    function renderMapCard(map, inSetup=false, open=false) {
+      const selected = state.selectedMapId === map.id;
+      return `<article class="card map ${selected ? 'selected' : ''} ${open ? 'open' : ''}">
+        <div class="card-head" onclick="${inSetup ? 'toggleSetupMap()' : `toggleMapOpen('${map.id}')`}">
+          ${!inSetup ? `<div class="pick" onclick="event.stopPropagation(); selectMap('${map.id}')"></div>` : `<span class="setup-type">Map</span>`}
+          <div class="card-main"><div class="card-name">${escapeHtml(map.name)}</div><div class="card-meta">${escapeHtml(map.type)} · ${escapeHtml(map.size)}</div></div>
+          ${inSetup ? `<button class="tiny-btn random" onclick="event.stopPropagation(); randomMap()">🎲</button><button class="tiny-btn remove" onclick="event.stopPropagation(); state.selectedMapId=null; state.setupMapOpen=false; saveState(); render();">✕</button>` : ''}
+          <span class="chev">›</span></div>
+        ${open ? `<div class="card-body">${mapSvg(map)}<div class="legend"><div class="legend-item"><span class="legend-color red"></span> Red Deployment</div><div class="legend-item"><span class="legend-color blue"></span> Blue Deployment</div><div class="legend-item"><span class="legend-circle">5</span> Objective Marker</div></div>${map.redSetup ? `<div class="setup-section red"><div class="setup-title"><span class="dot red"></span>Red Deployment: ${escapeHtml(map.redSetup.title)}</div>${map.redSetup.instructions.map(i=>`<div class="setup-step">${escapeHtml(i)}</div>`).join('')}</div>` : ''}${map.blueSetup ? `<div class="setup-section blue"><div class="setup-title"><span class="dot blue"></span>Blue Deployment: ${escapeHtml(map.blueSetup.title)}</div>${map.blueSetup.instructions.map(i=>`<div class="setup-step">${escapeHtml(i)}</div>`).join('')}</div>` : ''}${map.markerSetup ? `<div class="marker-box"><div class="marker-title">Mission Markers</div>${map.markerSetup.slice().sort((a,b)=>a.num-b.num).map(m=>`<div class="marker-row"><span class="badge ${m.num===5 ? 'center' : ''}">${m.num}</span><span class="marker-desc">${escapeHtml(m.desc)}</span></div>`).join('')}</div>` : ''}<div class="notes">${escapeHtml(map.notes)}</div></div>` : ''}
+      </article>`;
     }
-  };
-  
-  const randomBoth = () => {
-    setSelectedMission(activeMissions[Math.floor(Math.random() * activeMissions.length)]);
-    setSelectedMap(activeMaps[Math.floor(Math.random() * activeMaps.length)]);
-    setMissionExpanded(false);
-    setMapExpanded(false);
-  };
-  
-  const clearSetup = () => {
-    setSelectedMission(null);
-    setSelectedMap(null);
-    setMissionExpanded(false);
-    setMapExpanded(false);
-  };
-  
-  const handleBattleSizeChange = (size) => {
-    setBattleSize(size);
-    if (selectedMission && selectedMission.type.toLowerCase() !== size) {
-      setSelectedMission(null);
-      setMissionExpanded(false);
+    const missionOpen = new Set();
+    const mapOpen = new Set();
+    function toggleMissionOpen(id) { missionOpen.has(id) ? missionOpen.delete(id) : missionOpen.add(id); render(); }
+    function toggleMapOpen(id) { mapOpen.has(id) ? mapOpen.delete(id) : mapOpen.add(id); render(); }
+    function exportText() {
+      const m = selectedMission(), mp = selectedMap();
+      let t = `═══════════════════════════════════════
+STARCRAFT TMG - BATTLE SETUP
+═══════════════════════════════════════
+
+Battle Size: ${state.battleSize==='standard' ? 'STANDARD (54" × 36")' : 'SKIRMISH (36" × 36")'}
+Minerals: ${state.battleSize==='standard' ? '2,000' : '1,000'}
+Gas: ${state.battleSize==='standard' ? '200' : '100'}
+
+`;
+      if (m) { t += `───────────────────────────────────────
+MISSION: ${m.name}
+───────────────────────────────────────
+Game Length: ${m.gameLength} Rounds
+Supply per Round: ${m.perRound}
+Total Supply: ${m.supply}
+
+MISSION PARAMETERS:
+`; m.parameters.forEach(p=>t += `• ${p}
+`); t += `
+SCORING CONDITIONS:
+`; m.scoring.forEach(s=>t += `• ${s}
+`); if (m.additionalRules) { t += `
+ADDITIONAL RULES:
+`; m.additionalRules.forEach(r=>t += `• ${r.name} (${r.phase}): ${r.description}
+`); } t += `
+SPECIAL WINNING CONDITION:
+• ${m.special}
+
+`; } else t += `MISSION: Not selected
+
+`;
+      if (mp) { t += `───────────────────────────────────────
+MAP: ${mp.name}
+───────────────────────────────────────
+Size: ${mp.size}
+
+`; if (mp.redSetup) { t += `RED DEPLOYMENT: ${mp.redSetup.title}
+`; mp.redSetup.instructions.forEach(i=>t+=`• ${i}
+`); t += `
+`; } if (mp.blueSetup) { t += `BLUE DEPLOYMENT: ${mp.blueSetup.title}
+`; mp.blueSetup.instructions.forEach(i=>t+=`• ${i}
+`); t += `
+`; } if (mp.markerSetup) { t += `MISSION MARKERS:
+`; mp.markerSetup.slice().sort((a,b)=>a.num-b.num).forEach(m=>t += `• Marker ${m.num}: ${m.desc}
+`); t += `
+`; } t += `NOTES: ${mp.notes}
+`; } else t += `MAP: Not selected
+`;
+      return t;
     }
-    if (selectedMap && selectedMap.type.toLowerCase() !== size) {
-      setSelectedMap(null);
-      setMapExpanded(false);
+    function openExport() { document.getElementById('exportModal').classList.add('open'); document.getElementById('exportArea').value = exportText(); }
+    function closeExport() { document.getElementById('exportModal').classList.remove('open'); }
+    function renderSetup() {
+      const m = selectedMission(), mp = selectedMap();
+      document.getElementById('panel-setup').innerHTML = `
+        <div class="section"><div class="section-head"><div class="section-title">Battle Setup</div><div class="section-note">Pick a mission and map, or randomize both.</div></div>
+          <div class="group-card open"><div class="group-header"><div><div class="group-title">Current Setup</div><div class="group-subtitle">${m ? escapeHtml(m.name) : 'No mission'} · ${mp ? escapeHtml(mp.name) : 'No map'}</div></div><span class="chev">›</span></div><div class="group-body">
+            <div class="actions"><button class="btn accent" onclick="randomBoth()">🎲 Random Both</button>${(m||mp) ? `<button class="btn map" onclick="openExport()">📋 Export</button><button class="btn danger" onclick="clearSetup()">✕ Clear</button>` : ''}</div>
+            ${m ? renderMissionCard(m, true, state.setupMissionOpen) : `<div class="selected-slot"><div class="slot-top"><div class="slot-label">Mission</div><button class="tiny-btn random" onclick="randomMission()">🎲 Random</button></div><div class="slot-empty">Select a mission from the mission library.</div></div>`}
+            ${mp ? renderMapCard(mp, true, state.setupMapOpen) : `<div class="selected-slot"><div class="slot-top"><div class="slot-label">Map</div><button class="tiny-btn random" onclick="randomMap()">🎲 Random</button></div><div class="slot-empty">Select a map from the map library.</div></div>`}
+          </div></div></div>`;
     }
-  };
-  
-  const generateExport = () => {
-    let text = `═══════════════════════════════════════\n`;
-    text += `STARCRAFT TMG - BATTLE SETUP\n`;
-    text += `═══════════════════════════════════════\n\n`;
-    text += `Battle Size: ${battleSize === 'standard' ? 'STANDARD (54" × 36")' : 'SKIRMISH (36" × 36")'}\n`;
-    text += `Minerals: ${battleSize === 'standard' ? '2,000' : '1,000'}\n`;
-    text += `Gas: ${battleSize === 'standard' ? '200' : '100'}\n\n`;
-    
-    if (selectedMission) {
-      text += `───────────────────────────────────────\n`;
-      text += `MISSION: ${selectedMission.name}\n`;
-      text += `───────────────────────────────────────\n`;
-      text += `Game Length: ${selectedMission.gameLength} Rounds\n`;
-      text += `Supply per Round: ${selectedMission.perRound}\n`;
-      text += `Total Supply: ${selectedMission.supply}\n\n`;
-      text += `MISSION PARAMETERS:\n`;
-      selectedMission.parameters.forEach(p => text += `• ${p}\n`);
-      text += `\nSCORING CONDITIONS:\n`;
-      selectedMission.scoring.forEach(s => text += `• ${s}\n`);
-      if (selectedMission.additionalRules) {
-        text += `\nADDITIONAL RULES:\n`;
-        selectedMission.additionalRules.forEach(r => {
-          text += `• ${r.name} (${r.phase}): ${r.description}\n`;
-        });
-      }
-      text += `\nSPECIAL WINNING CONDITION:\n• ${selectedMission.special}\n\n`;
-    } else {
-      text += `MISSION: Not selected\n\n`;
+    function renderMissionLibrary() {
+      const list = activeMissions();
+      document.getElementById('panel-missions').innerHTML = `<div class="section"><div class="section-head"><div class="section-title">Mission Library</div><div class="section-note">${list.length} missions for ${state.battleSize}</div></div>${list.map(m=>renderMissionCard(m,false,missionOpen.has(m.id))).join('')}</div>`;
     }
-    
-    if (selectedMap) {
-      text += `───────────────────────────────────────\n`;
-      text += `MAP: ${selectedMap.name}\n`;
-      text += `───────────────────────────────────────\n`;
-      text += `Size: ${selectedMap.size}\n\n`;
-      if (selectedMap.redSetup) {
-        text += `RED DEPLOYMENT: ${selectedMap.redSetup.title}\n`;
-        selectedMap.redSetup.instructions.forEach(inst => text += `• ${inst}\n`);
-        text += `\n`;
-      }
-      if (selectedMap.blueSetup) {
-        text += `BLUE DEPLOYMENT: ${selectedMap.blueSetup.title}\n`;
-        selectedMap.blueSetup.instructions.forEach(inst => text += `• ${inst}\n`);
-        text += `\n`;
-      }
-      if (selectedMap.markerSetup) {
-        text += `MISSION MARKERS:\n`;
-        selectedMap.markerSetup.sort((a, b) => a.num - b.num).forEach(m => {
-          text += `• Marker ${m.num}: ${m.desc}\n`;
-        });
-        text += `\n`;
-      }
-      text += `NOTES: ${selectedMap.notes}\n`;
-    } else {
-      text += `MAP: Not selected\n`;
+    function renderMapLibrary() {
+      const list = activeMaps();
+      document.getElementById('panel-maps').innerHTML = `<div class="section"><div class="section-head"><div class="section-title">Map Library</div><div class="section-note">${list.length} maps for ${state.battleSize}</div></div>${list.map(m=>renderMapCard(m,false,mapOpen.has(m.id))).join('')}</div>`;
     }
-    
-    return text;
-  };
-
-  return (
-    <div className="app"><a href="index.html" className="home-btn" title="Home">←</a>
-      <style>{`
-        :root {
-          --bg: #1a1a1a;
-          --panel: #242424;
-          --panel-2: #2a2a2a;
-          --panel-3: #303030;
-          --text: #f0eee8;
-          --muted: #a8a299;
-          --border: #3a3a3a;
-          --accent: #eab308;
-          --success: #22c55e;
-          --warning: #eab308;
-          --error: #ef4444;
-          --radius: 16px;
-          --radius-sm: 10px;
-        }
-        .home-btn { position: fixed; top: 12px; left: 12px; width: 40px; height: 40px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border); color: var(--text); font-size: 1.2rem; display: grid; place-items: center; cursor: pointer; z-index: 100; text-decoration: none; }
-        .home-btn:hover { background: var(--panel-2); border-color: var(--accent);
-          --standard: #a855f7;
-          --skirmish: #22c55e;
-          --mission-color: #f97316;
-          --map-color: #06b6d4;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
-        .app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 12px; }
-        
-        .app-header { text-align: center; margin-bottom: 16px; padding: 16px; }
-        .app-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
-        .app-subtitle { font-size: 0.85rem; color: var(--muted); }
-        
-        .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-        .tab { flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); color: var(--muted); font-size: 0.9rem; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
-        .tab.active { border-color: var(--accent); color: var(--text); background: rgba(234, 179, 8, 0.15); }
-        
-        /* Battle Size Selector */
-        .size-selector { display: flex; gap: 8px; }
-        .size-btn { flex: 1; padding: 14px 12px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--panel-2); cursor: pointer; text-align: center; transition: all 0.15s; }
-        .size-btn.active { border-color: var(--accent); background: rgba(234, 179, 8, 0.1); }
-        .size-btn .size-name { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
-        .size-btn .size-meta { font-size: 0.75rem; color: var(--muted); }
-        .size-btn.active .size-meta { color: var(--accent); }
-        
-        /* Setup Panel */
-        .setup-panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
-        .setup-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .setup-panel-title { font-size: 1.1rem; font-weight: 700; }
-        .setup-panel-actions { display: flex; gap: 8px; }
-        .action-btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); color: var(--text); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
-        .action-btn:hover { background: var(--panel-3); }
-        .action-btn.accent { border-color: var(--accent); color: var(--accent); }
-        .action-btn.accent:hover { background: rgba(234, 179, 8, 0.15); }
-        .action-btn.danger { border-color: var(--error); color: var(--error); }
-        .action-btn.danger:hover { background: rgba(239, 68, 68, 0.15); }
-        
-        /* Selected Cards in Setup */
-        .selected-slot { background: var(--panel-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 12px; }
-        .selected-slot.filled { border-style: solid; border-color: var(--accent); background: rgba(234, 179, 8, 0.05); }
-        .slot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .slot-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-        .slot-actions { display: flex; gap: 6px; }
-        .slot-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-3); color: var(--muted); font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-        .slot-btn:hover { color: var(--text); border-color: var(--text); }
-        .slot-btn.random { border-color: var(--accent); color: var(--accent); }
-        .slot-empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
-        .slot-content { display: flex; align-items: center; gap: 12px; }
-        .slot-name { font-size: 1rem; font-weight: 700; }
-        .slot-meta { font-size: 0.75rem; color: var(--muted); }
-        .slot-remove { width: 28px; height: 28px; border: none; border-radius: 50%; background: rgba(239, 68, 68, 0.15); color: var(--error); font-size: 1.1rem; cursor: pointer; display: grid; place-items: center; margin-left: auto; flex-shrink: 0; }
-        .slot-remove:hover { background: rgba(239, 68, 68, 0.3); }
-        
-        /* Selectable Cards */
-        .mission-card.selectable, .map-card.selectable { cursor: pointer; transition: all 0.15s; }
-        .mission-card.selectable:hover, .map-card.selectable:hover { border-color: var(--accent); }
-        .mission-card.selected, .map-card.selected { border-color: var(--accent); background: rgba(234, 179, 8, 0.08); }
-        .select-box { width: 44px; height: 44px; margin: -10px; margin-right: 2px; display: grid; place-items: center; flex-shrink: 0; cursor: pointer; border-radius: 8px; transition: background 0.15s; }
-        .select-box:hover { background: rgba(255,255,255,0.05); }
-        .select-box:active { background: rgba(255,255,255,0.1); }
-        .select-indicator { min-width: 24px; width: 24px; height: 24px; aspect-ratio: 1; border: 2px solid var(--border); border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; flex-grow: 0; transition: all 0.15s; pointer-events: none; }
-        .mission-card.selected .select-indicator, .map-card.selected .select-indicator { border-color: var(--accent); background: var(--accent); }
-        .select-indicator::after { content: '✓'; font-size: 12px; font-weight: 700; color: transparent; }
-        .mission-card.selected .select-indicator::after, .map-card.selected .select-indicator::after { color: #000; }
-        
-        .section-group { margin-bottom: 16px; }
-        .section-header { display: flex; align-items: center; gap: 8px; padding: 8px 4px; margin-bottom: 8px; }
-        .section-dot { width: 8px; height: 8px; border-radius: 50%; }
-        .section-dot.standard { background: var(--standard); }
-        .section-dot.skirmish { background: var(--skirmish); }
-        .section-name { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-        .section-count { font-size: 0.7rem; color: var(--muted); opacity: 0.7; }
-        
-        /* Mission Card - Orange band */
-        .mission-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; border-left: 3px solid var(--mission-color); }
-        .mission-header { display: flex; align-items: center; padding: 14px; cursor: pointer; user-select: none; gap: 12px; }
-        .mission-title-row { flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-        .mission-name { font-size: 1rem; font-weight: 700; }
-        .mission-meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-        .mission-stats { display: flex; gap: 8px; }
-        .mission-stat { display: flex; flex-direction: column; align-items: center; padding: 6px 10px; background: var(--panel-2); border-radius: 8px; min-width: 50px; }
-        .mission-stat span { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-        .mission-stat { font-size: 0.9rem; font-weight: 700; }
-        .chevron { color: var(--muted); font-size: 18px; transition: transform 0.2s; flex-shrink: 0; }
-        .mission-card.open .chevron, .map-card.open .chevron { transform: rotate(90deg); }
-        
-        .mission-body { padding: 0 14px 14px; }
-        .mission-section { margin-bottom: 12px; padding: 10px 12px; background: var(--panel-2); border-radius: var(--radius-sm); }
-        .mission-section.special { background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); }
-        .mission-section-title { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); margin-bottom: 8px; }
-        .mission-rule { font-size: 0.85rem; line-height: 1.5; margin-bottom: 6px; padding-left: 12px; position: relative; }
-        .mission-rule::before { content: '•'; position: absolute; left: 0; color: var(--muted); }
-        .mission-rule:last-child { margin-bottom: 0; }
-        
-        .mission-ability { padding: 8px 0; }
-        .mission-ability-name { font-weight: 600; font-size: 0.9rem; }
-        .mission-ability-name span { font-weight: 400; color: var(--muted); font-size: 0.8rem; }
-        .mission-ability-desc { font-size: 0.85rem; line-height: 1.5; margin-top: 4px; color: var(--text); }
-        
-        /* Map Card - Cyan band */
-        .map-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; border-left: 3px solid var(--map-color); }
-        .map-header { display: flex; align-items: center; padding: 14px; cursor: pointer; user-select: none; gap: 12px; }
-        .map-header > div:not(.select-indicator):not(.select-box) { flex: 1; }
-        .map-name { font-size: 1rem; font-weight: 700; }
-        .map-meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-        
-        .map-body { padding: 0 14px 14px; }
-        .map-svg { width: 100%; height: auto; border-radius: var(--radius-sm); margin-bottom: 12px; }
-        
-        .map-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; padding: 10px 12px; background: var(--panel-2); border-radius: var(--radius-sm); }
-        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); }
-        .legend-box { width: 16px; height: 12px; border-radius: 3px; }
-        .legend-box.red { background: rgba(239, 68, 68, 0.3); border: 1px solid #ef4444; }
-        .legend-box.blue { background: rgba(59, 130, 246, 0.3); border: 1px solid #3b82f6; }
-        .legend-marker { width: 18px; height: 18px; border-radius: 50%; background: var(--panel-3); border: 1.5px solid var(--text); display: grid; place-items: center; font-size: 0.65rem; font-weight: 700; }
-        
-        .map-markers { padding: 10px 12px; background: var(--panel-2); border-radius: var(--radius-sm); margin-bottom: 12px; }
-        .map-markers-title { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 8px; }
-        .marker-list { display: flex; flex-direction: column; gap: 6px; }
-        .marker-row { display: flex; align-items: flex-start; gap: 10px; }
-        .marker-badge { width: 22px; height: 22px; border-radius: 50%; background: var(--panel-3); border: 2px solid var(--text); display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
-        .marker-badge.center { background: var(--accent); color: #000; border-color: var(--accent); }
-        .marker-desc { font-size: 0.8rem; color: var(--text); line-height: 1.4; padding-top: 2px; }
-        
-        .setup-section { padding: 12px; background: var(--panel-2); border-radius: var(--radius-sm); margin-bottom: 12px; }
-        .setup-section.red { border-left: 3px solid #ef4444; }
-        .setup-section.blue { border-left: 3px solid #3b82f6; }
-        .setup-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-        .setup-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-        .setup-dot.red { background: #ef4444; }
-        .setup-dot.blue { background: #3b82f6; }
-        .setup-instructions { display: flex; flex-direction: column; gap: 8px; }
-        .setup-step { font-size: 0.8rem; color: var(--text); line-height: 1.5; padding-left: 18px; position: relative; }
-        .setup-step::before { content: '•'; position: absolute; left: 0; color: var(--muted); }
-        
-        .map-notes { font-size: 0.8rem; color: var(--muted); font-style: italic; line-height: 1.4; padding: 10px 12px; background: rgba(234, 179, 8, 0.08); border-radius: var(--radius-sm); border-left: 2px solid var(--accent); }
-        
-        /* Divider */
-        .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 12px; }
-        .divider-line { flex: 1; height: 1px; background: var(--border); }
-        .divider-text { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-        
-        /* Export Modal */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-        .modal { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 440px; max-height: 80vh; display: flex; flex-direction: column; }
-        .modal-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .modal-title { font-size: 1.1rem; font-weight: 700; }
-        .modal-close { width: 32px; height: 32px; border: none; border-radius: 50%; background: var(--panel-2); color: var(--text); font-size: 1.2rem; cursor: pointer; display: grid; place-items: center; }
-        .modal-body { flex: 1; overflow: auto; padding: 16px; }
-        .export-text { width: 100%; min-height: 300px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; font-family: monospace; font-size: 0.75rem; color: var(--text); resize: none; line-height: 1.5; }
-        .modal-hint { font-size: 0.75rem; color: var(--muted); margin-top: 8px; text-align: center; }
-        
-        /* Selected Setup Card */
-        .setup-card { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
-        .setup-card-header { display: flex; align-items: center; padding: 14px; cursor: pointer; user-select: none; gap: 12px; background: rgba(234, 179, 8, 0.08); }
-        .setup-card-type { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); background: rgba(234, 179, 8, 0.15); padding: 3px 8px; border-radius: 4px; }
-        .setup-card-info { flex: 1; }
-        .setup-card-name { font-size: 1rem; font-weight: 700; }
-        .setup-card-meta { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-        .setup-card-actions { display: flex; gap: 6px; }
-        .setup-card-btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); color: var(--muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; }
-        .setup-card-btn:hover { background: var(--panel-3); color: var(--text); }
-        .setup-card-btn.random { border-color: var(--accent); color: var(--accent); }
-        .setup-card-btn.remove { border-color: var(--error); color: var(--error); }
-        .setup-card-body { padding: 0 14px 14px; }
-        
-        /* Group Card */
-        .group-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
-        .group-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; user-select: none; }
-        .group-title { font-size: 1.1rem; font-weight: 700; }
-        .group-subtitle { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
-        .group-card.open .chevron { transform: rotate(90deg); }
-        .group-body { padding: 0 12px 12px; }
-      `}</style>
-
-      <div className="app-header">
-        <div className="app-title">StarCraft TMG</div>
-        <div className="app-subtitle">Missions & Maps</div>
-      </div>
-
-      {/* Battle Size Selector */}
-      <Collapsible
-        className="group-card"
-        defaultOpen={true}
-        header={
-          <div className="group-header">
-            <div>
-              <div className="group-title">Battle Size</div>
-              <div className="group-subtitle">{battleSize === 'standard' ? 'Standard · 54" × 36" · 2000 Minerals' : 'Skirmish · 36" × 36" · 1000 Minerals'}</div>
-            </div>
-            <span className="chevron">›</span>
-          </div>
-        }
-      >
-        <div className="group-body">
-          <div className="size-selector">
-            <button 
-              className={`size-btn ${battleSize === 'standard' ? 'active' : ''}`}
-              onClick={() => handleBattleSizeChange('standard')}
-            >
-              <div className="size-name">Standard</div>
-              <div className="size-meta">54" × 36" · 2000 Minerals</div>
-            </button>
-            <button 
-              className={`size-btn ${battleSize === 'skirmish' ? 'active' : ''}`}
-              onClick={() => handleBattleSizeChange('skirmish')}
-            >
-              <div className="size-name">Skirmish</div>
-              <div className="size-meta">36" × 36" · 1000 Minerals</div>
-            </button>
-          </div>
-        </div>
-      </Collapsible>
-
-      {/* Battle Setup Header */}
-      <Collapsible
-        className="group-card"
-        defaultOpen={true}
-        header={
-          <div className="group-header">
-            <div>
-              <div className="group-title">Battle Setup</div>
-              <div className="group-subtitle">
-                {selectedMission ? selectedMission.name : 'No mission'} · {selectedMap ? selectedMap.name : 'No map'}
-              </div>
-            </div>
-            <span className="chevron">›</span>
-          </div>
-        }
-      >
-        <div className="group-body">
-          <div className="setup-panel-actions" style={{marginBottom: 12}}>
-            <button className="action-btn accent" onClick={randomBoth}>🎲 Random Both</button>
-            {(selectedMission || selectedMap) && (
-              <>
-                <button className="action-btn" onClick={() => setShowExportModal(true)}>📋 Export</button>
-                <button className="action-btn danger" onClick={clearSetup}>✕ Clear</button>
-              </>
-            )}
-          </div>
-
-          {/* Selected Mission */}
-          {selectedMission ? (
-            <div className="setup-card">
-              <div className="setup-card-header" onClick={() => setMissionExpanded(!missionExpanded)}>
-                <span className="setup-card-type">Mission</span>
-                <div className="setup-card-info">
-                  <div className="setup-card-name">{selectedMission.name}</div>
-                  <div className="setup-card-meta">{selectedMission.gameLength} Rounds · Supply {selectedMission.supply} · {selectedMission.perRound}/rnd</div>
-                </div>
-                <div className="setup-card-actions">
-                  <button className="setup-card-btn random" onClick={(e) => { e.stopPropagation(); randomMission(); }}>🎲</button>
-                  <button className="setup-card-btn remove" onClick={(e) => { e.stopPropagation(); setSelectedMission(null); setMissionExpanded(false); }}>✕</button>
-                </div>
-                <span className="chevron" style={{transform: missionExpanded ? 'rotate(90deg)' : 'none'}}>›</span>
-              </div>
-              {missionExpanded && (
-                <div className="setup-card-body">
-                  <div className="mission-section">
-                    <div className="mission-section-title">Mission Parameters</div>
-                    {selectedMission.parameters.map((p, i) => <div key={i} className="mission-rule">{p}</div>)}
-                  </div>
-                  <div className="mission-section">
-                    <div className="mission-section-title">Scoring Conditions</div>
-                    {selectedMission.scoring.map((s, i) => <div key={i} className="mission-rule">{s}</div>)}
-                  </div>
-                  {selectedMission.additionalRules && (
-                    <div className="mission-section">
-                      <div className="mission-section-title">Additional Rules</div>
-                      {selectedMission.additionalRules.map((r, i) => (
-                        <div key={i} className="mission-ability">
-                          <div className="mission-ability-name">{r.name} <span>({r.phase})</span></div>
-                          <div className="mission-ability-desc">{r.description}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mission-section special">
-                    <div className="mission-section-title">Special Winning Condition</div>
-                    <div className="mission-rule">{selectedMission.special}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="selected-slot">
-              <div className="slot-header">
-                <span className="slot-label">Mission</span>
-                <button className="slot-btn random" onClick={randomMission}>🎲 Random</button>
-              </div>
-              <div className="slot-empty">Select a mission from the library below</div>
-            </div>
-          )}
-
-          {/* Selected Map */}
-          {selectedMap ? (
-            <div className="setup-card">
-              <div className="setup-card-header" onClick={() => setMapExpanded(!mapExpanded)}>
-                <span className="setup-card-type">Map</span>
-                <div className="setup-card-info">
-                  <div className="setup-card-name">{selectedMap.name}</div>
-                  <div className="setup-card-meta">{selectedMap.size}</div>
-                </div>
-                <div className="setup-card-actions">
-                  <button className="setup-card-btn random" onClick={(e) => { e.stopPropagation(); randomMap(); }}>🎲</button>
-                  <button className="setup-card-btn remove" onClick={(e) => { e.stopPropagation(); setSelectedMap(null); setMapExpanded(false); }}>✕</button>
-                </div>
-                <span className="chevron" style={{transform: mapExpanded ? 'rotate(90deg)' : 'none'}}>›</span>
-              </div>
-              {mapExpanded && (
-                <div className="setup-card-body">
-                  <MapDiagram map={selectedMap} />
-                  <div className="map-legend">
-                    <div className="legend-item"><span className="legend-box red"></span> Red Deployment</div>
-                    <div className="legend-item"><span className="legend-box blue"></span> Blue Deployment</div>
-                    <div className="legend-item"><span className="legend-marker">5</span> Objective Marker</div>
-                  </div>
-                  {selectedMap.redSetup && (
-                    <div className="setup-section red">
-                      <div className="setup-title"><span className="setup-dot red"></span> Red Deployment: {selectedMap.redSetup.title}</div>
-                      <div className="setup-instructions">
-                        {selectedMap.redSetup.instructions.map((inst, i) => <div key={i} className="setup-step">{inst}</div>)}
-                      </div>
-                    </div>
-                  )}
-                  {selectedMap.blueSetup && (
-                    <div className="setup-section blue">
-                      <div className="setup-title"><span className="setup-dot blue"></span> Blue Deployment: {selectedMap.blueSetup.title}</div>
-                      <div className="setup-instructions">
-                        {selectedMap.blueSetup.instructions.map((inst, i) => <div key={i} className="setup-step">{inst}</div>)}
-                      </div>
-                    </div>
-                  )}
-                  {selectedMap.markerSetup && (
-                    <div className="map-markers">
-                      <div className="map-markers-title">Mission Markers</div>
-                      <div className="marker-list">
-                        {selectedMap.markerSetup.sort((a, b) => a.num - b.num).map(m => (
-                          <div key={m.num} className="marker-row">
-                            <span className={`marker-badge ${m.num === 5 ? 'center' : ''}`}>{m.num}</span>
-                            <span className="marker-desc">{m.desc}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="map-notes">{selectedMap.notes}</div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="selected-slot">
-              <div className="slot-header">
-                <span className="slot-label">Map</span>
-                <button className="slot-btn random" onClick={randomMap}>🎲 Random</button>
-              </div>
-              <div className="slot-empty">Select a map from the library below</div>
-            </div>
-          )}
-        </div>
-      </Collapsible>
-
-      {/* Mission Library */}
-      <div className="divider">
-        <div className="divider-line"></div>
-        <span className="divider-text">Mission Library</span>
-        <div className="divider-line"></div>
-      </div>
-
-      {activeMissions.map(m => (
-        <MissionCard 
-          key={m.id} 
-          mission={m} 
-          selectable={true}
-          selected={selectedMission?.id === m.id}
-          onSelect={() => selectMission(m)}
-        />
-      ))}
-
-      {/* Map Library */}
-      <div className="divider">
-        <div className="divider-line"></div>
-        <span className="divider-text">Map Library</span>
-        <div className="divider-line"></div>
-      </div>
-
-      {activeMaps.map(m => (
-        <MapCard 
-          key={m.id} 
-          map={m}
-          selectable={true}
-          selected={selectedMap?.id === m.id}
-          onSelect={() => selectMap(m)}
-        />
-      ))}
-
-      {/* Export Modal */}
-      {showExportModal && (
-        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">Export Battle Setup</div>
-              <button className="modal-close" onClick={() => setShowExportModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <textarea 
-                className="export-text" 
-                value={generateExport()} 
-                readOnly 
-                onClick={e => e.target.select()}
-              />
-              <div className="modal-hint">Tap to select all text, then copy</div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const container = document.getElementById('root');
-const root = ReactDOM.createRoot(container);
-root.render(React.createElement(App));
+    function renderRef() {
+      document.getElementById('panel-ref').innerHTML = `<div class="section"><div class="section-head"><div class="section-title">Reference</div><div class="section-note">Quick reminders for setup flow.</div></div>
+      <div class="group-card open"><div class="group-header"><div><div class="group-title">How to Use</div><div class="group-subtitle">Fast setup for play night</div></div><span class="chev">›</span></div><div class="group-body">
+      <div class="info-box"><div class="info-title">1. Choose Battle Size</div><div class="rule">Standard uses 54&quot; × 36&quot; maps and a 2,000 mineral limit.</div><div class="rule">Skirmish uses 36&quot; × 36&quot; maps and a 1,000 mineral limit.</div></div>
+      <div class="info-box"><div class="info-title">2. Pick Mission</div><div class="rule">Use the Missions tab to compare scoring, supply, and round structure.</div></div>
+      <div class="info-box"><div class="info-title">3. Pick Map</div><div class="rule">Use the Maps tab to review deployment zones, marker positions, and notes.</div></div>
+      <div class="info-box"><div class="info-title">4. Export</div><div class="rule">Use Export from the Setup tab to generate a plain-text battle setup summary.</div></div>
+      </div></div></div>`;
+    }
+    function render() {
+      document.querySelectorAll('.size-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.size === state.battleSize));
+      document.getElementById('sum-minerals').textContent = state.battleSize === 'standard' ? '2000' : '1000';
+      document.getElementById('sum-gas').textContent = state.battleSize === 'standard' ? '200' : '100';
+      document.getElementById('sum-board').textContent = state.battleSize === 'standard' ? '54×36' : '36×36';
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === state.activeTab));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + state.activeTab));
+      renderSetup(); renderMissionLibrary(); renderMapLibrary(); renderRef();
+    }
+    document.querySelectorAll('.size-btn').forEach(btn => btn.addEventListener('click', () => setBattleSize(btn.dataset.size)));
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => toggleTab(btn.dataset.tab)));
+    document.getElementById('closeModal').addEventListener('click', closeExport);
+    document.getElementById('exportModal').addEventListener('click', e => { if (e.target.id === 'exportModal') closeExport(); });
+    loadState(); render();
   </script>
 </body>
 </html>
