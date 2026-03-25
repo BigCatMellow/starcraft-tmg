@@ -1854,7 +1854,26 @@
       render();
     }
 
-    function doExport(mode) {
+    function slugifyFilenamePart(value) {
+      return String(value || 'army')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'army';
+    }
+
+    function triggerDownload(filename, content, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
+
+    function buildExportText(mode) {
       const lines = [];
       const totals = getTotals();
       const slots = getSlots();
@@ -1862,17 +1881,15 @@
       const thinDivider = '-'.repeat(50);
 
       lines.push(divider);
-      lines.push('  ' + (state.selectedFaction?.name?.toUpperCase() || 'ZERG') + ' - ' + state.selectedScale.name);
+      lines.push('  ' + (state.selectedFaction?.name?.toUpperCase() || 'ARMY') + ' - ' + state.selectedScale.name);
       lines.push(divider);
       lines.push('');
 
-      // Faction
       lines.push('FACTION: ' + state.selectedFaction?.name + ' (' + state.selectedFaction?.resource + ')');
       const slotStr = Object.entries(state.selectedFaction?.slots || {}).map(([s, c]) => s.charAt(0).toUpperCase() + c).join(' / ');
       lines.push('  Slots: ' + slotStr);
       lines.push('');
 
-      // Tactical
       if (state.armyTactical.length > 0) {
         lines.push('TACTICAL CARDS');
         lines.push(thinDivider);
@@ -1882,7 +1899,6 @@
         lines.push('');
       }
 
-      // Units
       if (state.armyUnits.length > 0) {
         lines.push('UNITS');
         lines.push(thinDivider);
@@ -1897,19 +1913,103 @@
             (entry.selectedUpgrades || []).forEach(upg => {
               lines.push('    + ' + upg.name + ' (+' + upg.cost + ')');
             });
+            if (mode === 'full') {
+              if (entry.unit.tags && entry.unit.tags.length) lines.push('    Tags: ' + entry.unit.tags.join(', '));
+              if (entry.tier?.characteristics) {
+                const c = entry.tier.characteristics;
+                const stats = [
+                  ['M', c.move], ['EVA', c.evade], ['ARM', c.armor], ['HP', c.hp], ['SH', c.shields], ['SUP', c.supply]
+                ].filter(([,v]) => v !== undefined && v !== null && v !== '');
+                if (stats.length) lines.push('    Stats: ' + stats.map(([k,v]) => k + ' ' + v).join(' | '));
+              }
+              (entry.unit.weapons || []).forEach(w => {
+                const parts = [];
+                if (w.range) parts.push('Range ' + w.range);
+                if (w.attack) parts.push('Atk ' + w.attack);
+                if (w.hit) parts.push('Hit ' + w.hit);
+                if (w.damage) parts.push('Dmg ' + w.damage);
+                if (w.target) parts.push('Target ' + w.target);
+                if (w.special) parts.push(w.special);
+                lines.push('    Weapon: ' + w.name + (parts.length ? ' — ' + parts.join(', ') : ''));
+              });
+              (entry.unit.abilities || []).forEach(ab => {
+                const head = [ab.phase, ab.name, ab.type].filter(Boolean).join(' | ');
+                lines.push('    Ability: ' + head + (ab.text ? ' — ' + ab.text : ''));
+              });
+            }
           });
+          lines.push('');
         });
-        lines.push('');
       }
 
       lines.push(divider);
       lines.push('  ' + totals.minerals + '/' + state.selectedScale.minerals + ' Mins - ' + totals.gas + '/' + state.selectedScale.gas + ' Gas - Supply ' + totals.supply);
       lines.push(divider);
 
-      state.exportText = lines.join('\n');
+      return lines.join('\n');
+    }
+
+    function doExport(mode) {
+      state.exportText = buildExportText(mode);
       state.showExportChoice = false;
       render();
     }
+
+    function downloadTextExport(mode) {
+      const factionName = state.selectedFaction?.name || 'army';
+      const scaleName = state.selectedScale?.name || 'list';
+      const filename = slugifyFilenamePart(factionName) + '-' + slugifyFilenamePart(scaleName) + '-' + mode + '-reference.txt';
+      triggerDownload(filename, buildExportText(mode), 'text/plain;charset=utf-8');
+      state.showExportChoice = false;
+      render();
+    }
+
+    function downloadJsonExport() {
+      const totals = getTotals();
+      const payload = {
+        savedAt: new Date().toISOString(),
+        faction: state.selectedFaction?.name || null,
+        scale: state.selectedScale?.name || null,
+        totals,
+        factionCard: state.selectedFaction ? {
+          id: state.selectedFaction.id,
+          name: state.selectedFaction.name,
+          resource: state.selectedFaction.resource,
+          slots: state.selectedFaction.slots || {}
+        } : null,
+        tacticalCards: (state.armyTactical || []).map(t => ({
+          id: t.id,
+          name: t.name,
+          cost: t.cost,
+          unique: !!t.unique,
+          phase: t.phase || null,
+          text: t.text || null
+        })),
+        units: (state.armyUnits || []).map(entry => ({
+          unitId: entry.unit?.id || null,
+          name: entry.unit?.name || null,
+          role: entry.unit?.role || null,
+          mineralCost: entry.cost,
+          tier: entry.tier ? {
+            level: entry.tier.level ?? null,
+            models: entry.tier.models ?? null,
+            supply: entry.tier.supply ?? null,
+            characteristics: entry.tier.characteristics || null
+          } : null,
+          selectedUpgrades: (entry.selectedUpgrades || []).map(upg => ({
+            id: upg.id || null,
+            name: upg.name,
+            cost: upg.cost,
+            text: upg.text || null
+          }))
+        }))
+      };
+      const filename = slugifyFilenamePart(state.selectedFaction?.name || 'army') + '-' + slugifyFilenamePart(state.selectedScale?.name || 'list') + '-save.json';
+      triggerDownload(filename, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+      state.showExportChoice = false;
+      render();
+    }
+
 
     function closeExportText() {
       state.exportText = null;
@@ -2420,8 +2520,9 @@
 
       if (state.showExportChoice) {
         html += '<div class="modal-overlay" onclick="closeExportChoice()"><div class="modal" onclick="event.stopPropagation()"><div class="modal-header"><div><div class="modal-title">Export Army</div><div class="modal-type">Choose format</div></div><button class="modal-close" onclick="closeExportChoice()">&#215;</button></div><div class="modal-body">';
-        html += '<button class="export-choice-btn" onclick="doExport(\'quick\')"><div class="export-choice-title">Quick Reference</div><div class="export-choice-desc">Compact cheat sheet for experienced players</div></button>';
-        html += '<button class="export-choice-btn" onclick="doExport(\'full\')"><div class="export-choice-title">Full Guide</div><div class="export-choice-desc">Complete guide with explanations</div></button>';
+        html += '<button class="export-choice-btn" onclick="downloadTextExport(\'quick\')"><div class="export-choice-title">Export Quick Reference TXT</div><div class="export-choice-desc">Download a compact text version for table use</div></button>';
+        html += '<button class="export-choice-btn" onclick="downloadTextExport(\'full\')"><div class="export-choice-title">Export Full Reference TXT</div><div class="export-choice-desc">Download a full text version with more detail</div></button>';
+        html += '<button class="export-choice-btn" onclick="downloadJsonExport()"><div class="export-choice-title">Save JSON</div><div class="export-choice-desc">Download a structured save file for future import</div></button>';
         html += '</div></div></div>';
       }
 
@@ -2460,14 +2561,13 @@
     render();
   </script>
 
-
 <script id="app-nav-menu-script">
 (function(){
   function initAppMenu(){
     if(document.getElementById('app-menu-overlay')) return;
-    var page=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+    var page=(location.pathname.split('/').pop()||'index-builder-style-launchers.html').toLowerCase();
     var links=[
-      ['Home','Main launcher','index.html','home'],
+      ['Home','Main launcher','index-builder-style-launchers.html','home'],
       ['Zerg','Army builder','zerg.html','zerg'],
       ['Protoss','Army builder','protoss.html','protoss'],
       ['Terran','Army builder','terran.html','terran'],
