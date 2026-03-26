@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Protoss Army Builder - StarCraft TMG</title>
+  <title>Protoss Army Builder (Plain JS) - StarCraft TMG</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1201,7 +1201,30 @@
       60% { transform: translate(-50%, -50%) scale(1); }
       100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
     }
-  </style>
+  
+  /* App Menu */
+  .app-menu-btn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:10000;width:44px;height:44px;border:none;border-radius:12px;background:rgba(36,36,36,.94);color:#f2f0e8;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.32), inset 0 0 0 1px rgba(255,255,255,.08);backdrop-filter:blur(8px);cursor:pointer}
+  .app-menu-btn:hover{background:rgba(48,48,48,.98)}
+  .app-menu-btn:active{transform:translateY(1px)}
+  .app-menu-btn .bars,.app-menu-btn .bars::before,.app-menu-btn .bars::after{display:block;width:18px;height:2px;background:currentColor;border-radius:2px;content:"";position:relative}
+  .app-menu-btn .bars::before{position:absolute;top:-6px;left:0}
+  .app-menu-btn .bars::after{position:absolute;top:6px;left:0}
+  .app-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.42);backdrop-filter:blur(2px);z-index:10001;opacity:0;pointer-events:none;transition:opacity .18s ease}
+  .app-menu-overlay.open{opacity:1;pointer-events:auto}
+  .app-menu-panel{position:absolute;top:0;left:0;height:100%;width:min(320px,86vw);background:linear-gradient(180deg, rgba(34,34,34,.98), rgba(26,26,26,.98));border-right:1px solid rgba(255,255,255,.08);box-shadow:0 20px 40px rgba(0,0,0,.45);transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 18px) 14px 16px}
+  .app-menu-overlay.open .app-menu-panel{transform:translateX(0)}
+  .app-menu-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .app-menu-title{font-size:1rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#f2f0e8}
+  .app-menu-close{border:none;background:rgba(255,255,255,.06);color:#f2f0e8;border-radius:10px;width:36px;height:36px;font-size:1.25rem;cursor:pointer}
+  .app-menu-links{display:grid;gap:8px;margin-top:6px}
+  .app-menu-link{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);color:#f2f0e8;text-decoration:none;font-weight:700;letter-spacing:.01em}
+  .app-menu-link small{display:block;color:#c8c6bd;font-weight:500;letter-spacing:0}
+  .app-menu-link.active{background:rgba(212,175,55,.18);border-color:rgba(212,175,55,.45);box-shadow:inset 0 0 0 1px rgba(212,175,55,.18)}
+  .app-menu-spacer{flex:1}
+  .app-menu-foot{color:#c8c6bd;font-size:.78rem;padding:8px 4px 0}
+  @media (min-width: 768px){ .app-menu-btn{left:16px;top:16px} }
+
+</style>
 </head>
 <body>
   <div class="app" id="app"></div>
@@ -1448,6 +1471,28 @@
     ]
   },
 ];
+
+    // ============================================================================
+    // STATE
+    // ============================================================================
+    let state = {
+      selectedScale: ENGAGEMENT_SCALES[1],
+      selectedFaction: PROTOSS_FACTION_CARDS[0],
+      armyUnits: [],
+      armyTactical: [],
+      activeTab: 'army',
+      expandedArmyCards: {},
+      expandedRoleGroups: {},
+      expandedLibraryCards: {},
+      openSections: {},
+      keywordModal: null,
+      tierPicker: null,
+      showExportChoice: false,
+      showClearConfirm: false,
+      exportText: null,
+      justAddedId: null,
+      glossarySearch: '',
+    };
 
     // ============================================================================
     // HELPERS
@@ -2316,5 +2361,51 @@
     load();
     render();
   </script>
+
+<script>
+(function(){
+  const links = [
+    ['index.html','Home','App launcher'],
+    ['zerg.html','Zerg','Swarm builder'],
+    ['protoss.html','Protoss','Conclave builder'],
+    ['terran.html','Terran','Dominion builder'],
+    ['missions.html','Missions','Scenario setup'],
+    ['rules.html','Rules','Reference guide']
+  ];
+  const path = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+  const btn = document.createElement('button');
+  btn.className='app-menu-btn';
+  btn.type='button';
+  btn.setAttribute('aria-label','Open navigation menu');
+  btn.setAttribute('data-app-menu','button');
+  btn.innerHTML='<span class="bars"></span>';
+
+  const overlay = document.createElement('div');
+  overlay.className='app-menu-overlay';
+  overlay.setAttribute('data-app-menu','overlay');
+  const panel = document.createElement('div');
+  panel.className='app-menu-panel';
+  panel.innerHTML = `
+    <div class="app-menu-head">
+      <div class="app-menu-title">StarCraft TMG</div>
+      <button class="app-menu-close" type="button" aria-label="Close navigation menu">×</button>
+    </div>
+    <nav class="app-menu-links">
+      ${links.map(([href,label,desc])=>`<a class="app-menu-link ${path===href.toLowerCase()?'active':''}" href="${href}"><span>${label}<small>${desc}</small></span><span>›</span></a>`).join('')}
+    </nav>
+    <div class="app-menu-spacer"></div>
+    <div class="app-menu-foot">Quick app navigation</div>`;
+  overlay.appendChild(panel);
+  function openMenu(){ overlay.classList.add('open'); document.body.style.overflow='hidden'; }
+  function closeMenu(){ overlay.classList.remove('open'); document.body.style.overflow=''; }
+  btn.addEventListener('click', openMenu);
+  overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeMenu(); });
+  panel.querySelector('.app-menu-close').addEventListener('click', closeMenu);
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeMenu(); });
+  document.body.appendChild(btn);
+  document.body.appendChild(overlay);
+})();
+</script>
+
 </body>
 </html>
