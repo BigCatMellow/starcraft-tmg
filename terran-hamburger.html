@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Protoss Army Builder - StarCraft TMG</title>
+  <title>Terran Army Builder - StarCraft TMG</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,18 +16,18 @@
       --text: #f0eee8;
       --muted: #a8a299;
       --border: #3a3a3a;
-      --accent: #D4AF37;
+      --accent: #2F6DB3;
       --success: #22c55e;
       --warning: #fbbf24;
       --error: #ef4444;
-      --gas: #8be9fd;
+      --gas: #22d3ee;
       --role-hero: #f59e0b;
-      --role-elite: #8b5cf6;
-      --role-core: #60a5fa;
-      --role-support: #2dd4bf;
+      --role-elite: #a855f7;
+      --role-core: #3b82f6;
+      --role-support: #22c55e;
       --role-other: #6b7280;
-      --tactical: #c084fc;
-      --glossary: #f472b6;
+      --tactical: #06b6d4;
+      --glossary: #ec4899;
     }
     
     body {
@@ -288,7 +288,7 @@
 
     /* Army Card - Expandable */
     .army-card {
-      background: linear-gradient(135deg, #1f2436 0%, var(--panel-2) 100%);
+      background: linear-gradient(135deg, #282838 0%, var(--panel-2) 100%);
       border: 1px solid var(--border);
       border-radius: 10px;
       margin-bottom: 8px;
@@ -1201,6 +1201,35 @@
       60% { transform: translate(-50%, -50%) scale(1); }
       100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
     }
+  
+    /* App Menu */
+    .app-menu-btn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:10000;width:44px;height:44px;border:none;border-radius:12px;background:rgba(36,36,36,.94);color:#f2f0e8;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.32), inset 0 0 0 1px rgba(255,255,255,.08);backdrop-filter:blur(8px);cursor:pointer}
+    .app-menu-btn:hover{background:rgba(48,48,48,.98)}
+    .app-menu-btn:active{transform:translateY(1px)}
+    .app-menu-btn .bars,.app-menu-btn .bars::before,.app-menu-btn .bars::after{display:block;width:18px;height:2px;background:currentColor;border-radius:2px;content:"";position:relative}
+    .app-menu-btn .bars::before{position:absolute;top:-6px;left:0}
+    .app-menu-btn .bars::after{position:absolute;top:6px;left:0}
+    .app-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.58);backdrop-filter:blur(2px);z-index:9998;opacity:0;pointer-events:none;transition:opacity .18s ease}
+    .app-menu-overlay.open{opacity:1;pointer-events:auto}
+    .app-menu-panel{position:fixed;top:0;left:0;height:100dvh;width:min(320px,84vw);background:linear-gradient(180deg,var(--panel) 0%, var(--panel-2) 100%);border-right:1px solid var(--border);box-shadow:16px 0 40px rgba(0,0,0,.35);z-index:9999;transform:translateX(-102%);transition:transform .22s ease;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px calc(env(safe-area-inset-bottom,0px) + 14px)}
+    .app-menu-panel.open{transform:translateX(0)}
+    .app-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 2px 14px;border-bottom:1px solid var(--border);margin-bottom:12px}
+    .app-menu-title{font-size:.92rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
+    .app-menu-close{width:36px;height:36px;border:none;border-radius:10px;background:var(--panel-3);color:var(--text);font-size:20px;line-height:1;cursor:pointer}
+    .app-menu-links{display:flex;flex-direction:column;gap:8px}
+    .app-menu-link{display:flex;align-items:center;gap:10px;padding:12px 12px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02);color:var(--text);text-decoration:none;font-weight:600}
+    .app-menu-link:hover{background:rgba(255,255,255,.05)}
+    .app-menu-link.active{border-color:var(--accent);background:rgba(47,109,179,.14);color:#fff}
+    .app-menu-link .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+    .app-menu-link.home .dot{background:#f2f0e8}
+    .app-menu-link.zerg .dot{background:#8b5cf6}
+    .app-menu-link.protoss .dot{background:#d4af37}
+    .app-menu-link.terran .dot{background:var(--accent)}
+    .app-menu-link.missions .dot{background:#22c55e}
+    .app-menu-link.rules .dot{background:#ec4899}
+    .app-menu-spacer{flex:1}
+    .app-menu-note{padding-top:12px;border-top:1px solid var(--border);color:var(--muted);font-size:.74rem}
+
   </style>
 </head>
 <body>
@@ -1216,39 +1245,67 @@
     const KEYWORDS = {
   'ANTI-EVADE': { type: 'Combat', description: 'The target suffers -X to its Evade Rolls for this attack.' },
   'BUFF': { type: 'Effect', description: 'The Unit gains a bonus of X to the specified Characteristic until End of the Round.' },
+  'BULKY': { type: 'Weapon', description: 'This weapon cannot be used in the same Activation as another weapon with the BULKY keyword.' },
+  'BURST FIRE': { type: 'Weapon', description: 'When the target is Within X inches, the weapon gains +Y Rate of Attack.' },
   'CRITICAL HIT': { type: 'Combat', description: 'Move X dice directly from the Armour Pool to the Damage Pool, bypassing armour.' },
   'DEBUFF': { type: 'Effect', description: 'The Unit suffers a penalty of X to the specified Characteristic until End of the Round.' },
   'DISPLACEMENT': { type: 'Movement', description: 'This model/token can be moved through by other models and does not block movement.' },
-  'DODGE': { type: 'Combat', description: 'When making Armour Rolls, remove up to X dice from the Armour Pool before rolling.' },
   'FLYING': { type: 'Status', description: 'Flying units ignore terrain when moving, are never Engaged, cannot Charge or be Charged, and cannot contest or control Mission Markers.' },
   'HEAL': { type: 'Effect', description: 'Remove X points of accumulated Damage from the Unit. HEAL cannot return Destroyed models.' },
   'HIDDEN': { type: 'Status', description: 'Enemies more than 4" away cannot target this unit with ranged attacks or Line of Sight abilities. The unit is immune to IMPACT and gets an Evade Roll against every attack.' },
-  'HITS': { type: 'Effect', description: 'The target immediately suffers X automatic hits with Damage Y, bypassing the Attack Pool and going straight to Armour Rolls.' },
   'IMPACT': { type: 'Combat', description: 'After a successful Charge, each eligible model generates X extra dice. Rolls of Y or higher become automatic hits placed in the Armour Pool.' },
+  'INDIRECT FIRE': { type: 'Weapon', description: 'This weapon ignores Line of Sight requirements. The target still benefits from Cover.' },
   'INSTANT': { type: 'Weapon', description: 'This weapon resolves immediately, typically granting the INSTANT keyword to close combat weapons for the active unit.' },
+  'LOCKED IN': { type: 'Weapon', description: 'This weapon can only target enemies Within X inches of the aimed point.' },
+  'LONG RANGE': { type: 'Weapon', description: 'The weapon\'s maximum range extends to X inches, but shots beyond the normal listed range suffer a -1 Hit penalty.' },
+  'NON-LETHAL DAMAGE': { type: 'Effect', description: 'The unit suffers X damage that cannot reduce a model below 1 HP. Excess damage is ignored.' },
   'PIERCE': { type: 'Combat', description: 'When attacking a target with the specified tag, move up to X dice from the Armour Pool directly to the Damage Pool.' },
+  'PINPOINT': { type: 'Weapon', description: 'This weapon can target individual models within a unit rather than the unit as a whole.' },
   'PLACE': { type: 'Movement', description: 'Remove the Leading Model and set it Wholly Within X inches of its starting point. PLACE ignores normal pathing, gap clearance, terrain restrictions, and elevation requirements, then the unit is rebuilt in Coherency.' },
   'PRECISION': { type: 'Combat', description: 'After rolling to hit, move up to X missed dice into the Armour Pool. They still need to survive armour.' },
-  'PSIONIC ENERGY': { type: 'Protoss', description: 'Protoss resource used to activate special abilities. Generated by Tactical Cards with +EN resource bonus.' },
-  'SHIELDED': { type: 'Status', description: 'The first model in the unit gets extra Hit Points equal to its Shield value. The status ends when that shield is broken or the first model is removed.' },
+  'SIDEARM': { type: 'Weapon', description: 'This weapon can be fired in addition to one other non-SIDEARM weapon in the same Activation.' },
+  'SPECIALIST': { type: 'Weapon', description: 'Only one model in the unit may use this weapon per Activation.' },
   'STATIONARY': { type: 'Status', description: 'All units start each round Stationary. The status is lost the moment the unit moves, is moved, or is placed.' },
   'TOUGH': { type: 'Combat', description: 'When making Armour Rolls, convert up to X failed results into successes.' },
 };
+
+    const TAGS = {
+      'Armoured': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Armoured deal bonus damage that bypasses armour when attacking this unit.' },
+      'Biological': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Biological deal bonus damage that bypasses armour when attacking this unit.' },
+      'Flying': { type: 'Combat Tag', description: 'Flying units are never Engaged and cannot Engage. They cannot Charge or be Charged. They ignore terrain and Gap Clearance during movement. They do not participate in the Combat Phase. They cannot Contest or Control Mission Markers. They never benefit from High Ground Cover. Must end movement at least 1" from enemy Flying units.' },
+      'Ground': { type: 'Combat Tag', description: 'Ground units can Engage other Ground units when Within 1". Weapons with Target: Ground can only hit units with this tag. Ground units participate in the Combat Phase when Engaged.' },
+      'Light': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Light deal bonus damage that bypasses armour when attacking this unit.' },
+      'Mechanical': { type: 'Combat Tag', description: 'Used for targeting and surge interactions. Weapons with Surge Type: Mechanical deal bonus damage that bypasses armour when attacking this unit.' },
+      'Psionic': { type: 'Special Tag', description: 'This unit has psychic abilities. Used as a marker for ability targeting - certain abilities specifically affect or reference Psionic units. Does not affect Surge damage.' },
+      'Unique': { type: 'Special Tag', description: 'Only one of this unit may be included in your army list.' },
+    };
+
+    const SURGE_TAGS = ['Armoured', 'Biological', 'Light', 'Mechanical'];
+    const TYPE_TAGS = ['Ground', 'Flying'];
+
+    // ============================================================================
+    // DATA: Engagement Scales
+    // ============================================================================
+    const ENGAGEMENT_SCALES = [
+      { id: 'skirmish', name: 'Skirmish', minerals: 1000, gas: 100, table: '36" x 36"' },
+      { id: 'standard', name: 'Standard', minerals: 2000, gas: 200, table: '36" x 54"' },
+      { id: 'grand', name: 'Grand', minerals: 9999, gas: 999, table: '36" x 72"' },
+    ];
 
     // ============================================================================
     // DATA: Faction Cards
     // ============================================================================
     const ZERG_FACTION_CARDS = [
-  { id: 'daelaam', name: 'Daelaam', unique: true, resource: '+1 EN', slots: { elite: 1, core: 3, support: 1 },
+  { id: 'raynors-raiders', name: "Raynor's Raiders", unique: true, resource: '+1 CP', slots: { hero: 1, core: 3, support: 1 },
     abilities: [
-      { phase: 'Any Phase', name: "Dae'Uhl", type: 'Reaction', description: 'When a Friendly Unit receives Damage, reduce the Total Damage by 2 (to a minimum of 1).' },
-      { phase: 'Movement Phase', name: 'Mass Recall', type: 'Active', description: 'Once per Game. Place a Faction Indicator anywhere on the battlefield. All Friendly Protoss Units Within 6" of this Faction Indicator are removed from the battlefield and placed in Reserves.' }
+      { phase: 'Movement Phase', name: 'Rapid Reinforcements', type: 'Active', description: 'Place a Friendly Point Defence Drone Unit anywhere on the battlefield, more than 1" away from any Enemy model. Remove this Unit at the End of the Round.' },
+      { phase: 'Movement Phase', name: 'Ready for Pickup?', type: 'Active', description: 'Once per Game. The active Unit resolves the PLACE (12) effect. Models placed by this effect cannot be set up Within the Engagement Range of any Enemy Unit. This resolves instead of performing a standard action.' }
     ]
   },
-  { id: 'khalai', name: 'Khalai', unique: true, resource: '+1 EN', slots: { hero: 1, elite: 2, core: 3 },
+  { id: 'terran-armed-forces', name: 'Terran Armed Forces', unique: true, resource: '+1 CP', slots: { elite: 1, core: 3, support: 1 },
     abilities: [
-      { phase: 'Movement Phase', name: 'Pylon Warp-In', type: 'Active', description: 'If there is no Friendly Pylon on the battlefield, place a Friendly Pylon Unit anywhere on the GROUND LEVEL of the battlefield more than 10" away from any Enemy model. This Round, the Pylon is not eligible to use its Special Abilities (excluding Structure).' },
-      { phase: 'Movement Phase', name: 'Bound by the Khala', type: 'Active', description: "At the end of the active Unit's Activation, select one other Friendly Unit eligible to Activate in the current Phase. Immediately Activate that Unit." }
+      { phase: 'Movement Phase', name: 'Tactical Retreat', type: 'Active', description: 'The active Unit ignores the Disengage penalty for the remainder of the Round.' },
+      { phase: 'Movement Phase', name: 'Terran Tenacity', type: 'Active', description: 'Once per Game. Immediately claim the First Player Marker. No other player may claim the First Player Marker for the remainder of this Phase.' }
     ]
   }
 ];
@@ -1258,133 +1315,152 @@
     // ============================================================================
     const ZERG_UNITS = [
   // HERO
-  { id: 'artanis', name: 'Artanis', role: 'Hero', unique: true, tags: ['Biological', 'Psionic', 'Ground'],
-    stats: { shield: 4, speed: '7', evade: '5+', armour: '4+', hp: 8, size: 2 },
-    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 250, models: '1', supply: 1 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
+  { id: 'jim-raynor', name: 'Jim Raynor', role: 'Hero', unique: true, tags: ['Biological', 'Ground'],
+    stats: { shield: null, speed: '7', evade: '5+', armour: '4+', hp: 8, size: 2 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 230, models: '1', supply: 1 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
     weapons: [
-      { name: 'Twilight Blades Strike', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '2+', surge: 'Armoured', sDie: 'D3', damage: 3, keywords: [] },
-      { name: 'Twilight Blades Sweep', phase: 'Combat', range: 'E', target: 'Ground', roa: 6, hit: '2+', surge: 'Light', sDie: 'D3+1', damage: 1, keywords: [] }
+      { name: 'Commando Rifle', phase: 'Assault', range: '18', target: 'All', roa: 3, hit: '3+', surge: 'Armoured', sDie: 'D3', damage: 1, keywords: ['BULKY', 'PIERCE Armoured (3)'] },
+      { name: 'C-14 Rifle', phase: 'Assault', range: '12', target: 'All', roa: 6, hit: '3+', surge: 'Light', sDie: 'D3+1', damage: 1, keywords: ['BURST FIRE 8" (3)'], replaces: 'Commando Rifle' },
+      { name: '"Justice" Revolver', phase: 'Assault', range: '6', target: 'Ground', roa: 2, hit: '3+', surge: '-', sDie: '-', damage: 2, keywords: ['ANTI-EVADE (2)', 'SIDEARM', 'PINPOINT'] },
+      { name: 'Bayonet', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: 'Light', sDie: 'D3', damage: 1, keywords: [] }
     ],
-    abilities: [{ phase: 'Any Phase', name: 'Commander', type: 'Passive', description: "Treat this Unit's Supply characteristic as increased by 1 for Controlling and Contesting Mission Markers, completing objectives, and resolving Disengage checks." }],
+    abilities: [
+      { phase: 'Any Phase', name: 'Commander', type: 'Passive', description: "Treat this Unit's Supply characteristic as increased by 1 for Controlling and Contesting Mission Markers, completing objectives, and resolving Disengage checks." },
+      { phase: 'Any Phase', name: 'Freedom Fighters', type: 'Passive', description: 'The Supply Value of all Friendly Units Within 8" of this Unit cannot be reduced below 1 for Contesting Mission Markers and completing objectives.' }
+    ],
     phaseAbilities: {
-      'Movement Phase': [{ name: 'Phase Prism', type: 'Passive', description: "When Artanis is nominated to deploy from Reserves, it may resolve the PLACE (0) effect from another Friendly Unit. That Friendly Unit is removed from the battlefield and returned to Reserves. Artanis' Activation ends." }],
-      'Assault Phase': [
-        { name: "Hierarch's Stand", type: 'Reaction (1 Psionic Energy)', description: 'When another Friendly Unit Within 8" is declared as the target of a Ranged Attack and this Unit is a valid target, redirect the attack to this Unit. This Unit is eligible to make an Evade Roll against the redirected attack. This Special Ability remains active until the End of the current Activation.' },
-        { name: 'Lightning Dash', type: 'Reaction (1 Psionic Energy)', description: 'After this Unit resolves a successful Charge action, it may declare a second Charge action against a different Enemy Unit, ignoring the restriction on Charging while Engaged. The Devastating Charge ability does not trigger a second time.' },
-        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (6) 4+ effect.' }
-      ]
+      'Movement Phase': [{ name: 'Orders', type: 'Active (X Command Point)', description: 'REPEATABLE. Select another Friendly Biological Unit Within 8", spend CP and apply one of the following effects: 1 CP: That Unit\'s first used weapon gains the CRITICAL HIT (2). 1 CP: That Unit ignores the Disengage penalty for the remainder of the Round. 2 CP: Remove the Activation Marker from that Unit.' }]
     },
     upgrades: {}
   },
 
   // ELITE
-  { id: 'praetor-guard', name: 'Praetor Guard (Zealot)', role: 'Elite', unique: true, factionTag: 'Khalai', tags: ['Biological', 'Light', 'Ground'],
-    stats: { shield: 3, speed: '4/7', evade: '5+', armour: '5+', hp: 4, size: 2 },
-    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 280, models: '2-3', supply: 2 }, { tier: 'T1', cost: null, models: '1', supply: 1 }],
-    weapons: [{ name: 'Psi Blades', phase: 'Combat', range: 'E', target: 'Ground', roa: 4, hit: '3+', surge: 'Light', sDie: 'D3', damage: 1, keywords: [] }],
-    abilities: [{ phase: 'Any Phase', name: 'Shield Overcharge', type: 'Passive', description: 'This Unit gains TOUGH (2) on the first Armour Roll each Round.' }],
+  { id: 'goliath', name: 'Goliath', role: 'Elite', tags: ['Armoured', 'Mechanical', 'Ground'],
+    stats: { shield: null, speed: '7', evade: '-', armour: '4+', hp: 10, size: 3 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 190, models: '1', supply: 2 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
+    weapons: [
+      { name: 'Autocannon', phase: 'Assault', range: '12', target: 'Ground', roa: 9, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: ['LONG RANGE (18")'] },
+      { name: 'Underbelly Machine Gun', phase: 'Assault', range: '8', target: 'Ground', roa: 6, hit: '3+', surge: 'Light', sDie: 'D3', damage: 1, keywords: ['PINPOINT', 'SIDEARM'] },
+      { name: 'Hellfire Missiles', phase: 'Assault', range: '16', target: 'Flying', roa: 6, hit: '3+', surge: 'Light', sDie: 'D3', damage: 1, keywords: ['ANTI-EVADE (1)', 'SIDEARM'] },
+      { name: 'Stomp', phase: 'Combat', range: 'E', target: 'Ground', roa: 4, hit: '5+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+    ],
+    abilities: [],
     phaseAbilities: {
-      'Movement Phase': [{ name: 'Leg Enhancements', type: 'Active (1 Psionic Energy)', description: "This Unit performs a 2\" Move action. This does not count towards its action limit." }],
+      'Movement Phase': [{ name: 'Target Lock', type: 'Active (1 Command Point)', description: 'Select one Enemy Unit Within 12". Whenever a Friendly Goliath Unit targets that enemy with an Autocannon, that weapon gains Surge Type: Light, Armoured, and S Dice: D3+1.' }],
       'Assault Phase': [
-        { name: 'Charge', type: 'Active (1 Psionic Energy)', description: "When determining Charge Distance for this Unit, roll 2D6 instead of D6 and use the higher result to add to the Unit's Speed characteristic." },
-        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (3) 4+ effect.' }
-      ],
-      'Combat Phase': [
-        { name: 'Titan Killers', type: 'Passive', description: "When this Unit makes a Close Combat Attack, and the target is Size 3 or larger, the weapon's Damage characteristic is treated as 2." },
-        { name: 'Precognition', type: 'Passive', description: 'This Unit is eligible to make an Evade roll against all attacks targeting it.' }
+        { name: 'Indomitable', type: 'Passive', description: 'While Engaged, this Unit may target and be targeted by Unengaged Enemy Units. In both cases, the defending Unit gains an Evade Roll against those attacks.' },
+        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (4) 3+ effect.' }
       ]
     },
-    upgrades: {}
-  },
-  { id: 'stalker', name: 'Stalker', role: 'Elite', tags: ['Armoured', 'Mechanical', 'Ground'],
-    stats: { shield: 3, speed: '4/8', evade: '6+', armour: '4+', hp: 6, size: 3 },
-    tiers: [{ tier: 'T3', cost: 260, models: '2', supply: 2 }, { tier: 'T2', cost: 160, models: '1', supply: 1 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
-    weapons: [
-      { name: 'Particle Disruptors', phase: 'Assault', range: '12', target: 'All', roa: 4, hit: '3+', surge: 'Armoured', sDie: 'D3', damage: 2, keywords: [] },
-      { name: 'Stomp', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '5+', surge: '-', sDie: '-', damage: 1, keywords: [] }
-    ],
-    abilities: [{ phase: 'Any Phase', name: 'Squadron', type: 'Passive', description: "This Unit's Horizontal Coherency is 4\"." }],
-    phaseAbilities: {
-      'Movement Phase': [{ name: 'Blink', type: 'Active (1 Psionic Energy)', description: 'Resolve the PLACE (6) effect. Models set by this effect cannot be set up Within the Engagement Range of any Enemy Unit.' }]
-    },
     upgrades: {
-      'Any Phase': [{ name: 'Path of Shadows', cost: '20/40', type: 'Active (1 Psionic Energy)', description: 'This Unit gains HIDDEN Status until it performs another action.' }],
-      'Assault Phase': [{ name: 'Fury of the Nerazim', cost: '20/30', type: 'Passive', description: 'When this Unit attacks an Enemy Unit that has already been Activated during this Phase, its Particle Disruptors gain INSTANT for that attack.' }]
+      'Any Phase': [{ name: 'Ares-Class Targeting System', cost: 20, type: 'Passive', description: "This Unit's Autocannon and Underbelly Machine Gun weapons gain PRECISION (1)." }],
+      'Assault Phase': [
+        { name: 'Scatter Missiles', cost: 30, type: 'Weapon', description: 'Replaces Hellfire Missiles. RNG 18, TGT Ground, RoA 6, Hit 5+, Surge Light, S.Die D3, Dmg 1. Keywords: INDIRECT FIRE, LOCKED IN (6), LONG RANGE (24"), SIDEARM.', modifies: { weapon: 'Hellfire Missiles' } },
+        { name: 'Haywire Missiles', cost: 40, type: 'Weapon', description: 'Replaces Hellfire Missiles. RNG 12, TGT Ground, RoA 3, Hit 3+, Surge Armoured, S.Die D3, Dmg 1. Keywords: PIERCE Armoured (3), SIDEARM.', modifies: { weapon: 'Hellfire Missiles' } }
+      ]
     }
   },
 
   // CORE
-  { id: 'adept', name: 'Adept', role: 'Core', tags: ['Biological', 'Light', 'Ground'],
-    stats: { shield: 2, speed: '5/8', evade: '5+', armour: '5+', hp: 3, size: 2 },
-    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 150, models: '3-4', supply: 1 }, { tier: 'T1', cost: null, models: '1-2', supply: 0 }],
+  { id: 'marauder', name: 'Marauder', role: 'Core', tags: ['Armoured', 'Biological', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '6+', armour: '4+', hp: 5, size: 2 },
+    tiers: [{ tier: 'T3', cost: 280, models: '3-4', supply: 2 }, { tier: 'T2', cost: 150, models: '2', supply: 1 }, { tier: 'T1', cost: null, models: '1', supply: 0 }],
     weapons: [
-      { name: 'Glaive Cannon', phase: 'Assault', range: '8', target: 'All', roa: 2, hit: '3+', surge: 'Light', sDie: 'D3+1', damage: 1, keywords: ['ANTI-EVADE (1)'] },
-      { name: 'Strike', phase: 'Combat', range: 'E', target: 'Ground', roa: 1, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+      { name: 'Quad K12', phase: 'Assault', range: '12', target: 'Ground', roa: 3, hit: '3+', surge: 'Armoured', sDie: 'D3', damage: 1, keywords: ['PIERCE Armoured (2)'] },
+      { name: 'Strike', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '4+', surge: '-', sDie: '-', damage: 1, keywords: [] }
     ],
-    abilities: [{ phase: 'Any Phase', name: 'Psionic Presence', type: 'Passive', description: "All Weapons of Friendly Units targeting an Enemy Unit Within 4\" of this Unit's Shade token gain PRECISION (1)." }],
-    phaseAbilities: {
-      'Movement Phase': [{ name: 'Psionic Transfer', type: 'Active (1 Psionic Energy)', description: 'Set a Shade token Wholly Within 12" of any model in this Unit. At the End of the Round, the controlling player may set all models of this Unit in Coherency, treating the Shade token as the Leading Model. The Shade token has DISPLACEMENT.' }]
-    },
-    upgrades: {
-      'Assault Phase': [
-        { name: 'Resonating Glaives', cost: 20, type: 'Active (1 Psionic Energy)', description: "This Unit's Glaive Cannon gains BUFF RoA (1)." },
-        { name: 'Guidance', cost: 10, type: 'Passive', description: "This Unit's Glaive Cannon Ranged weapon gains ANTI-EVADE (2).", modifies: { weapon: 'Glaive Cannon', changes: { keywords: ['ANTI-EVADE (2)'] } } }
-      ],
-      'Combat Phase': [{ name: 'Glaive Strike', cost: 20, type: 'Weapon', description: 'Replaces Strike. RNG E, TGT Ground, RoA 1, Hit 4+, Surge Light, S.Die D3, Dmg 1. Keywords: PIERCE Light (2).', modifies: { weapon: 'Strike' } }]
-    }
-  },
-  { id: 'zealot', name: 'Zealot', role: 'Core', tags: ['Biological', 'Light', 'Ground'],
-    stats: { shield: 3, speed: '4/7', evade: '5+', armour: '5+', hp: 4, size: 2 },
-    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 160, models: '2-3', supply: 2 }, { tier: 'T1', cost: null, models: '1', supply: 1 }],
-    weapons: [{ name: 'Psi Blades', phase: 'Combat', range: 'E', target: 'Ground', roa: 4, hit: '3+', surge: 'Light', sDie: 'D3', damage: 1, keywords: [] }],
     abilities: [],
     phaseAbilities: {
-      'Assault Phase': [
-        { name: 'Charge', type: 'Active (1 Psionic Energy)', description: "When determining Charge Distance for this Unit, roll 2D6 instead of D6 and use the higher result to add to the Unit's Speed characteristic." },
-        { name: 'Devastating Charge', type: 'Passive', description: 'Immediately after this Unit completes a successful Charge, resolve the IMPACT (3) 4+ effect.' }
-      ]
+      'Movement Phase': [{ name: 'Stimpack', type: 'Active (1 Command Point)', description: 'This Unit suffers NON-LETHAL DAMAGE (2). This Unit gains BUFF Speed (3). Additionally, its Quad K12 and all Close Combat Weapons gain PRECISION (2).' }],
+      'Assault Phase': [{ name: 'Concussive Shells', type: 'Reaction (1 Command Point)', description: 'When an Enemy declares a Charge against a Friendly Unit Within 8", that Enemy gains DEBUFF Speed (2).' }]
     },
     upgrades: {
-      'Any Phase': [{ name: 'My Life for Aiur', cost: 10, type: 'Passive', description: 'When this Unit resolves IMPACT, each eligible model generates 1 additional IMPACT die.' }],
-      'Movement Phase': [{ name: 'Leg Enhancements', cost: 20, type: 'Active (1 Psionic Energy)', description: "This Unit performs a 2\" Move action. This does not count towards its action limit." }],
-      'Assault Phase': [{ name: 'Zealous Round', cost: 10, type: 'Reaction (0 Psionic Energy)', description: 'When this Unit is not Activated and receives Damage, the controlling player may count this Unit as Activated in this Phase (flip its Activation Marker) to reduce the Total Damage by 2.' }],
-      'Combat Phase': [{ name: 'We Stand as One', cost: 20, type: 'Passive', description: "When this Unit makes a Close Combat Attack, if the target is Engaged with at least 1 other Friendly Unit, this Unit's Close Combat Weapon gains PRECISION (2)." }]
+      'Any Phase': [
+        { name: 'Veteran of Tarsonis', cost: '20/40', type: 'Passive', description: "While this Unit is Within 3\" of a Mission Marker, its Armour characteristic is increased by 1." },
+        { name: 'Kinetic Foam', cost: '20/40', type: 'Passive', description: "Increase this Unit's Hit Points characteristic by 1." }
+      ],
+      'Assault Phase': [{ name: 'Laser Targeting Systems', cost: '20/40', type: 'Passive', description: 'This Unit\'s Quad K12 weapon gains LONG RANGE (16").' }]
     }
+  },
+  { id: 'marine', name: 'Marine', role: 'Core', tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '5+', armour: '5+', hp: 2, size: 2 },
+    tiers: [{ tier: 'T3', cost: 210, models: '7-9', supply: 2 }, { tier: 'T2', cost: 160, models: '4-6', supply: 1 }, { tier: 'T1', cost: null, models: '1-3', supply: 0 }],
+    weapons: [
+      { name: 'C-14 Rifle', phase: 'Assault', range: '12', target: 'All', roa: 2, hit: '3+', surge: 'Light', sDie: 'D3', damage: 1, keywords: [] },
+      { name: 'Strike', phase: 'Combat', range: 'E', target: 'Ground', roa: 1, hit: '5+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+    ],
+    abilities: [],
+    phaseAbilities: {
+      'Movement Phase': [{ name: 'Stimpack', type: 'Active (1 Command Point)', description: 'This Unit suffers NON-LETHAL DAMAGE (2). This Unit gains BUFF Speed (3). Additionally, its C-14 Rifle and all Close Combat Weapons gain PRECISION (3).' }]
+    },
+    upgrades: {
+      'Movement Phase': [{ name: 'Combat Shield', cost: '20/30', type: 'Active (1 Command Point)', description: 'This Unit is always eligible to make an Evade Roll against any Close Combat Attack targeting it and any Damage from an Enemy Special Ability.' }],
+      'Assault Phase': [
+        { name: 'AGG-12', cost: 10, type: 'Weapon', description: 'Replaces C-14 Rifle. RNG 12, TGT Ground, RoA 2, Hit 3+, Surge Armoured, S.Die D3, Dmg 1. Keywords: LONG RANGE (18"), SPECIALIST.', modifies: { weapon: 'C-14 Rifle' } },
+        { name: 'Rocket Launcher', cost: 40, type: 'Weapon', description: 'Additional weapon. RNG 12, TGT Ground, RoA 4, Hit 3+, Dmg 1. Keywords: INDIRECT FIRE, LONG RANGE (18"), SIDEARM, SPECIALIST.' },
+        { name: 'Slugthrower', cost: '10/20', type: 'Passive', description: 'When this Unit makes a Ranged Attack with a C-14 Rifle and the target is Within 8", that weapon gains ANTI-EVADE (1).' },
+        { name: 'Grenades - Frag', cost: 10, type: 'Passive', description: "When this Unit makes a Ranged Attack with a C-14 Rifle and the target is Within 8\", that weapon's S Dice is replaced by D6." }
+      ],
+      'Combat Phase': [{ name: 'Bayonet', cost: '20/30', type: 'Weapon', description: 'Replaces Strike. RNG E, TGT Ground, RoA 2, Hit 5+, Dmg 1.', modifies: { weapon: 'Strike' } }]
+    }
+  },
+  { id: 'raynors-raider', name: "Raynor's Raider (Marine)", role: 'Core', factionTag: "Raynor's Raiders", tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '5+', armour: '5+', hp: 2, size: 2 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 230, models: '1-6', supply: 1 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
+    weapons: [
+      { name: 'C-14 Rifle', phase: 'Assault', range: '12', target: 'All', roa: 2, hit: '3+', surge: 'Light', sDie: 'D3', damage: 1, keywords: [] },
+      { name: 'Bayonet', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '5+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+    ],
+    abilities: [],
+    phaseAbilities: {
+      'Movement Phase': [
+        { name: 'Stimpack', type: 'Active (1 Command Point)', description: 'This Unit suffers NON-LETHAL DAMAGE (2). This Unit gains BUFF Speed (3). Additionally, its C-14 Rifle and all Close Combat Weapons gain PRECISION (3).' },
+        { name: 'Raiders Roll!', type: 'Passive', description: 'When this Unit is nominated to deploy from Reserves, it may resolve its Stimpack ability with the CP cost reduced by 1 (to a minimum of 0).' },
+        { name: 'Rapid Reinforcements', type: 'Passive', description: "When this Unit is nominated to deploy from Reserves, it may resolve the PLACE (10) effect from another Friendly Unit. No model may be set Within 8\" of any Enemy model. This Unit's Activation ends." }
+      ],
+      'Assault Phase': [
+        { name: 'Slugthrower', type: 'Passive', description: 'When this Unit makes a Ranged Attack with a C-14 Rifle and the target is Within 8", that weapon gains ANTI-EVADE (1).' },
+        { name: 'Grenades - Frag', type: 'Passive', description: "When this Unit makes a Ranged Attack with a C-14 Rifle and the target is Within 8\", that weapon's S Dice is replaced by D6." }
+      ]
+    },
+    upgrades: {}
   },
 
   // SUPPORT
-  { id: 'sentry', name: 'Sentry', role: 'Support', tags: ['Light', 'Mechanical', 'Psionic', 'Ground'],
-    stats: { shield: 2, speed: '4/7', evade: '6+', armour: '5+', hp: 4, size: 1 },
-    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 130, models: '2', supply: 1 }, { tier: 'T1', cost: null, models: '1', supply: 0 }],
-    weapons: [
-      { name: 'Disruption Beam', phase: 'Assault', range: '8', target: 'All', roa: 2, hit: '2+', surge: '-', sDie: '-', damage: 1, keywords: ['INSTANT'] },
-      { name: 'Beam', phase: 'Combat', range: 'E', target: 'Ground', roa: 2, hit: '3+', surge: '-', sDie: '-', damage: 1, keywords: [] }
+  { id: 'medic', name: 'Medic', role: 'Support', tags: ['Biological', 'Light', 'Ground'],
+    stats: { shield: null, speed: '4/7', evade: '5+', armour: '5+', hp: 2, size: 2 },
+    tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 110, models: '2-3', supply: 1 }, { tier: 'T1', cost: null, models: '1', supply: 0 }],
+    weapons: [{ name: 'Strike', phase: 'Combat', range: 'E', target: 'Ground', roa: 1, hit: '5+', surge: '-', sDie: '-', damage: 1, keywords: [] }],
+    abilities: [
+      { phase: 'Any Phase', name: 'Life Support', type: 'Reaction (1 Command Point)', description: 'Use when another Friendly Biological Unit suffers Damage Within 4". Reduce the Total Damage before allocation by 1 for each model in this Unit that is Within 4" of the damaged Unit.' },
+      { phase: 'Any Phase', name: 'Restoration', type: 'Reaction (1 Command Point)', description: 'Use when a Friendly Unit Within 4" receives a DEBUFF. Remove all DEBUFFS from it.' }
     ],
-    abilities: [{ phase: 'Any Phase', name: 'Restoration', type: 'Reaction (1 Psionic Energy)', description: 'Use when a Friendly Unit Within 4" receives a DEBUFF. Remove all DEBUFFS from it.' }],
     phaseAbilities: {
       'Movement Phase': [
-        { name: 'Force Field', type: 'Active (1 Psionic Energy)', description: 'Set a Force Field token Within 8" in an unoccupied space. Units of Size 2 or lower cannot move across Force Fields. Models of Size 3 or more can move over it, and it\'s then removed.' },
-        { name: 'Guardian Shield', type: 'Active (1 Psionic Energy)', description: 'All Ranged Attacks targeting a Friendly Unit Within 4" (Line of Sight is not required) are made with 1 fewer die in the Attack Pool.' }
+        { name: 'Medpack', type: 'Active (1 Command Point)', description: 'Select another Friendly Biological Unit Within 4". Resolve the HEAL (X) effect for the targeted Unit, where X is the number of models in this Unit that are Within 4" of the target Unit.' },
+        { name: 'Optical Flare', type: 'Active (2 Command Point)', description: 'Select one Enemy Unit Within 12". Until the End of the Round, apply DEBUFF Range (4) to that Unit\'s Ranged Weapons. That Unit cannot benefit from LONG RANGE.' }
       ]
     },
     upgrades: {
-      'Movement Phase': [{ name: 'Solid-Field Projectors', cost: 20, type: 'Active (1 Psionic Energy)', description: 'Set a Force Field token Within 8" in an unoccupied space. Units of Size 2 or lower cannot move across Force Fields. Models of Size 3 or more can move over it, and it\'s then removed.' }],
-      'Assault Phase': [{ name: 'Hallucination', cost: 30, type: 'Reaction (0 Psionic Energy)', description: 'When an Enemy Unit declares a Ranged Attack against a Friendly Unit Within 4", the targeted Friendly Unit is eligible to make an Evade Roll against that attack.' }]
+      'Any Phase': [
+        { name: 'Advanced Medic Facilities', cost: 60, type: 'Passive', description: "This Unit's Supply Value counts as 0 when calculating the Supply Pool." },
+        { name: 'A-13 Flash Grenade Launcher', cost: 20, type: 'Passive', description: 'Increase the Optical Flare special ability\'s Range to 16".' },
+        { name: 'Stabilizer Medpacks', cost: 30, type: 'Passive', description: 'When this Unit resolves a Life Support or Medpack ability, treat it as having 1 additional model Within Range for calculating that ability\'s effects.' }
+      ]
     }
   },
 
   // OTHER
-  { id: 'pylon', name: 'Pylon', role: 'Other', factionTag: 'Khalai', tags: ['Armoured', 'Ground'],
-    stats: { shield: 2, speed: '-', evade: '-', armour: '5+', hp: 8, size: 3 },
+  { id: 'point-defense-drone', name: 'Point Defense Drone', role: 'Other', factionTag: "Raynor's Raiders", tags: ['Armoured', 'Mechanical', 'Flying'],
+    stats: { shield: null, speed: '-', evade: '6+', armour: '6+', hp: 3, size: null },
     tiers: [{ tier: 'T3', cost: null, models: '-', supply: 0 }, { tier: 'T2', cost: 0, models: '1', supply: 0 }, { tier: 'T1', cost: null, models: '-', supply: 0 }],
     weapons: [],
     abilities: [
-      { phase: 'Any Phase', name: 'Structure', type: 'Passive', description: 'This Unit cannot be Activated in any Phase and cannot perform actions. Its Current Supply Value is treated as 0, and it can never Control or Contest Mission Markers. This Unit cannot be a target of an ability, unless stated otherwise.' },
-      { phase: 'Any Phase', name: 'Khalai Ingenuity', type: 'Passive', description: "Once per Round, when a Friendly Unit Within 4\" of this Pylon uses a Special Ability that costs Psionic Energy, that ability's PE cost is reduced by 1." }
+      { phase: 'Any Phase', name: 'Point Defense Laser', type: 'Passive', description: 'When another Friendly Unit Within 4" is targeted by a Ranged Attack without the INSTANT keyword, remove up to 2 dice from the Attack Pool. Then remove this Unit from the battlefield.' },
+      { phase: 'Any Phase', name: 'Gliding', type: 'Passive', description: 'This model has DISPLACEMENT.' },
+      { phase: 'Any Phase', name: 'Structure', type: 'Passive', description: 'This Unit cannot be Activated in any Phase and cannot perform actions. Its Current Supply Value is treated as 0, and it can never Control or Contest Mission Markers. This Unit cannot be a target of an ability, unless stated otherwise.' }
     ],
-    phaseAbilities: {
-      'Movement Phase': [{ name: 'Warp Conduit', type: 'Passive', description: "Once per Round, the controlling player may deploy a Ground Unit from Reserves using this Pylon base as the Entry Edge. This Unit's Activation ends." }]
-    },
+    phaseAbilities: {},
     upgrades: {}
   },
 ];
@@ -1393,61 +1469,77 @@
     // DATA: Tactical Cards
     // ============================================================================
     const ZERG_TACTICAL_CARDS = [
-  { id: 'forge', name: 'Forge', unique: false, cost: 30, resource: '+1 EN', slots: { elite: 1 }, category: 'combat',
+  { id: 'academy', name: 'Academy', unique: true, cost: 35, resource: '+1 CP', slots: { support: 2 },
+    abilities: [{ phase: 'Any Phase', name: 'Advanced Training', type: 'Reaction', description: 'Once per Round, when a Friendly Support Unit activates a Special Ability that costs CP, resolve that ability with its CP cost reduced by 1 (to a minimum of 0). Do not Exhaust this card.' }]
+  },
+  { id: 'armory', name: 'Armory', unique: false, cost: 30, resource: '+1 CP', slots: { elite: 1 },
     abilities: [
-      { phase: 'Any Phase', name: 'Ground Armor', type: 'Reaction', description: 'Use before a Friendly Ground Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll.' },
-      { phase: 'Assault Phase', name: 'Ground Weapons', type: 'Active', description: "The active Ground Unit's first Ranged Weapon used gains CRITICAL HIT (1)." }
+      { phase: 'Any Phase', name: 'Vehicle Plating', type: 'Reaction', description: 'Use before a Friendly Mechanical Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll.' },
+      { phase: 'Assault Phase', name: 'Vehicle Weapons', type: 'Active', description: "The active Mechanical Unit's first Ranged Weapon used gains CRITICAL HIT (1)." }
     ]
   },
-  { id: 'gate-chronoboosted', name: 'Gate Chronoboosted', unique: true, cost: 40, resource: '+1 EN', slots: { elite: 1, core: 1 }, category: 'combat',
+  { id: 'barracks', name: 'Barracks', unique: false, cost: 25, resource: '+1 CP', slots: { core: 1 },
+    abilities: [{ phase: 'Movement Phase', name: 'Go! Go! Go!', type: 'Active', description: 'The active Biological Unit performs a 2" Move action. This does not count towards its action limit.' }]
+  },
+  { id: 'barracks-proxy', name: 'Barracks (Proxy)', unique: true, cost: 40, resource: '+2 CP', slots: { core: 2 },
     abilities: [
-      { phase: 'Movement Phase', name: 'Zealous Charge', type: 'Active', description: 'The active Unit gains BUFF Speed (2).' },
-      { phase: 'Combat Phase', name: 'Quick Strikes', type: 'Active', description: "The active Unit's first Close Combat Weapon used gains PRECISION (2)." }
+      { phase: 'Movement Phase', name: 'Go! Go! Go!', type: 'Active', description: 'The active Biological Unit performs a 2" Move action. This does not count towards its action limit.' },
+      { phase: 'Movement Phase', name: 'Armed and Ready', type: 'Active', description: "The active Biological Unit Deploys from any table edge that is not a player's Entry Edge. No model may be placed Within 10\" of any Enemy model. This ability cannot be used if another Friendly Biological Unit has already been Deployed this Round." }
     ]
   },
-  { id: 'gateway', name: 'Gateway', unique: false, cost: 25, resource: '+1 EN', slots: { core: 1 }, category: 'combat',
-    abilities: [{ phase: 'Combat Phase', name: 'Quick Strikes', type: 'Active', description: "The active Unit's first Close Combat Weapon used gains PRECISION (2)." }]
-  },
-  { id: 'nexus', name: 'Nexus', unique: true, cost: 35, resource: '+1 EN', slots: { core: 2 }, category: 'positioning',
+  { id: 'barracks-tech-lab', name: 'Barracks (Tech Lab)', unique: true, cost: 45, resource: '+2 CP', slots: { elite: 1, core: 1 },
     abilities: [
-      { phase: 'Any Phase', name: 'Ancient Pride', type: 'Active', description: "The active Unit's first Weapon used gains INSTANT." },
-      { phase: 'Movement Phase', name: 'Strategic Recall', type: 'Active', description: 'The active, Unengaged Ground Unit is placed in Reserves instead of performing an action.' }
+      { phase: 'Movement Phase', name: 'Go! Go! Go!', type: 'Active', description: 'The active Biological Unit performs a 2" Move action. This does not count towards its action limit.' },
+      { phase: 'Assault Phase', name: "Let's Have a Blast!", type: 'Active', description: "The active Biological Unit's first Ranged Weapon used gains ANTI-EVADE (1)." }
     ]
   },
-  { id: 'observer', name: 'Observer', unique: true, cost: 25, resource: '+1 EN', slots: { support: 1 }, category: 'positioning',
+  { id: 'dropship', name: 'Dropship', unique: true, cost: 40, resource: '+1 CP', slots: { core: 1, support: 1 },
     abilities: [
-      { phase: 'Movement Phase', name: 'Surveillance', type: 'Active', description: 'Place a Faction Indicator anywhere on the battlefield. While Enemy Units are Within 6" of this Faction Indicator, they lose HIDDEN.' },
-      { phase: 'Assault Phase', name: 'Gravitic Boosters', type: 'Reaction', description: 'Use after a Friendly Unit rolls a D6 for Charge Distance. Add 1 to the Charge Distance for this Unit.' }
+      { phase: 'Movement Phase', name: 'Strap in!', type: 'Active', description: 'The active, Unengaged Ground Unit is placed in Reserves instead of performing an action.' },
+      { phase: 'Movement Phase', name: 'Ready For Dust-off', type: 'Active', description: 'Place a Faction Indicator anywhere on the battlefield more than 10" away from any Enemy model. At the End of the Round, the controlling player may Deploy one Ground Unit from Reserves in base-to-base contact with this Faction Indicator.' }
     ]
   },
-  { id: 'overcharged-nexus', name: 'Overcharged Nexus', unique: true, cost: 35, resource: '+1 EN', slots: { elite: 1, core: 1 }, category: 'positioning',
+  { id: 'engineering-bay', name: 'Engineering Bay', unique: false, cost: 30, resource: '+1 CP', slots: { core: 1 },
     abilities: [
-      { phase: 'Any Phase', name: 'Photon Overcharge', type: 'Reaction', description: 'Use when an Enemy Unit enters the battlefield from Reserves via a location other than its own Entry Edge. That Unit immediately suffers HITS 3 (1).' },
-      { phase: 'Movement Phase', name: 'Strategic Recall', type: 'Active', description: 'The active, Unengaged Ground Unit is placed in Reserves instead of performing an action.' }
+      { phase: 'Any Phase', name: 'Infantry Armor', type: 'Reaction', description: 'Use before a Friendly Biological Unit makes an Armour Roll. That Unit gains TOUGH (1) for this roll.' },
+      { phase: 'Assault Phase', name: 'Infantry Weapons', type: 'Active', description: "The active Biological Unit's first Ranged Weapon used gains CRITICAL HIT (1)." }
     ]
   },
-  { id: 'power-field', name: 'Power Field', unique: true, cost: 40, resource: '+1 EN', slots: { hero: 1, elite: 1, core: 1 }, category: 'defense',
-    abilities: [{ phase: 'Any Phase', name: 'Guardian Shell', type: 'Reaction', description: 'Use before a Friendly Ground Unit makes an Armour Roll. That Unit gains DODGE (2) for this roll.' }]
+  { id: 'factory', name: 'Factory', unique: false, cost: 35, resource: '+1 CP', slots: { elite: 2 },
+    abilities: [{ phase: 'Movement Phase', name: 'Field Repair', type: 'Active', description: 'The active Mechanical Unit resolves the HEAL (2) effect.' }]
   },
-  { id: 'twilight-council', name: 'Twilight Council', unique: true, cost: 40, resource: '+1 EN', slots: { elite: 1, support: 1 }, category: 'positioning',
+  { id: 'orbital-command', name: 'Orbital Command', unique: true, cost: 25, resource: '+1 CP', slots: { core: 1 },
     abilities: [
-      { phase: 'Any Phase', name: 'Veil of Shadows', type: 'Reaction', description: 'Use after a Friendly Unit resolves a PLACE effect. That Unit immediately resolves the HEAL (2) effect.' },
-      { phase: 'Assault Phase', name: 'Weapons of the Firstborn', type: 'Active', description: "The active Ground Unit's first Ranged Weapon used gains BUFF Range (4)." }
+      { phase: 'Movement Phase', name: 'ComSat Station', type: 'Active', description: "Select one table edge that is not a player's Entry Edge. Until the End of the Round, Enemy Units cannot Deploy from that edge." },
+      { phase: 'Movement Phase', name: 'Scanner Sweep', type: 'Active', description: 'Place a Faction Indicator anywhere on the battlefield. While Enemy Units are Within 6" of this Faction Indicator, they lose HIDDEN.' }
     ]
   },
-  { id: 'warp-gate', name: 'Warp Gate', unique: true, cost: 40, resource: '+1 EN', slots: { core: 2 }, category: 'positioning',
-    abilities: [
-      { phase: 'Movement Phase', name: 'Warp In', type: 'Active', description: "The active Ground Unit Deploys from any table edge that is not a player's Entry Edge. This deployment must end more than 10\" away from any Enemy model. The controlling player cannot use this ability if another Friendly Ground Unit has already Deployed this Round." },
-      { phase: 'Combat Phase', name: 'Quick Strikes', type: 'Active', description: "The active Unit's first Close Combat Weapon used gains PRECISION (2)." }
-    ]
-  },
-  { id: 'warp-prism', name: 'Warp Prism', unique: true, cost: 45, resource: '+1 EN', slots: { core: 2 }, category: 'positioning',
-    abilities: [
-      { phase: 'Movement Phase', name: 'Phase', type: 'Active', description: 'The active Unit resolves the PLACE (3) effect.' },
-      { phase: 'Movement Phase', name: 'Warp Conduit', type: 'Active', description: 'Place a Faction Indicator anywhere on the battlefield more than 10" away from any Enemy model. At the End of the Round, the controlling player may Deploy one Ground Unit from Reserves in base-to-base contact with this Faction Indicator.' }
-    ]
+  { id: 'supply-depot', name: 'Supply Depot', unique: true, cost: 40, resource: '+1 CP', slots: { hero: 1, elite: 1, core: 1 },
+    abilities: [{ phase: 'Movement Phase', name: 'Additional Supply Depots', type: 'Active', description: "The active Unit's Supply Value is improved by 1 for Controlling and Contesting Mission Markers and completing objectives." }]
   },
 ];
+
+    // ============================================================================
+    // STATE
+    // ============================================================================
+    let state = {
+      selectedScale: ENGAGEMENT_SCALES[1],
+      selectedFaction: ZERG_FACTION_CARDS[0],
+      armyUnits: [],
+      armyTactical: [],
+      activeTab: 'army', // 'army', 'units', 'tactical', 'factions', 'glossary'
+      expandedArmyCards: {},
+      expandedRoleGroups: {}, // Track which role groups are expanded
+      expandedLibraryCards: {},
+      openSections: {},
+      keywordModal: null,
+      tierPicker: null,
+      showExportChoice: false,
+      showClearConfirm: false,
+      exportText: null,
+      justAddedId: null,
+      glossarySearch: '',
+    };
 
     // ============================================================================
     // HELPERS
@@ -1522,13 +1614,13 @@
           factionId: state.selectedFaction?.id,
           scaleId: state.selectedScale?.id
         };
-        localStorage.setItem('sc-tmg-protoss-v1', JSON.stringify(toSave));
+        localStorage.setItem('sc-tmg-zerg-v4', JSON.stringify(toSave));
       } catch (e) { console.error(e); }
     }
 
     function load() {
       try {
-        const saved = localStorage.getItem('sc-tmg-protoss-v1');
+        const saved = localStorage.getItem('sc-tmg-zerg-v4');
         if (saved) {
           const { units, tactical, factionId, scaleId } = JSON.parse(saved);
           const rehydratedUnits = (units || []).map(entry => {
@@ -1719,7 +1811,7 @@
       const thinDivider = '-'.repeat(50);
 
       lines.push(divider);
-      lines.push('  ' + (state.selectedFaction?.name?.toUpperCase() || 'PROTOSS') + ' - ' + state.selectedScale.name);
+      lines.push('  ' + (state.selectedFaction?.name?.toUpperCase() || 'ZERG') + ' - ' + state.selectedScale.name);
       lines.push(divider);
       lines.push('');
 
@@ -1883,7 +1975,7 @@
             state.armyTactical.forEach((card, idx) => {
               html += '<div class="army-card" style="border-left: 3px solid var(--tactical);">';
               html += '<div class="army-card-header" onclick="toggleArmyCard(\'tac-' + idx + '\')">';
-              html += '<div class="army-card-info"><h3>' + card.name + (card.unique ? ' <span class="unique-badge">Unique</span>' : '') + '</h3><div class="army-card-meta">' + (card.resource || 'Tactical Card') + '</div></div>';
+              html += '<div class="army-card-info"><h3>' + card.name + (card.unique ? ' <span class="unique-badge">Unique</span>' : '') + '</h3><div class="army-card-meta">' + (card.resource || 'Creep Card') + '</div></div>';
               html += '<div class="army-card-right"><div class="army-card-cost" style="color: var(--gas);">' + card.cost + ' Gas</div><span class="army-card-chevron">' + (state.expandedArmyCards['tac-' + idx] ? '&#9662;' : '&#8250;') + '</span></div>';
               html += '</div>';
               if (state.expandedArmyCards['tac-' + idx]) {
@@ -2123,9 +2215,9 @@
       html += '<div class="tab-header"><div class="tab-title">Tactical Cards</div></div>';
       
       const tacticalCategories = [
-        { id: 'combat', name: 'Combat', desc: 'Weapon and armor support' },
-        { id: 'defense', name: 'Defense', desc: 'Damage mitigation and survivability' },
-        { id: 'positioning', name: 'Positioning', desc: 'Warping, recall, deployment, and support' }
+        { id: 'creep', name: 'Creep', desc: 'Spread and buff creep mechanics' },
+        { id: 'combat', name: 'Combat', desc: 'Improve attacks and defense' },
+        { id: 'positioning', name: 'Positioning', desc: 'Deployment, ambush, detection' }
       ];
       
       const renderTacticalCard = (card) => {
@@ -2316,5 +2408,49 @@
     load();
     render();
   </script>
+
+  <button class="app-menu-btn" id="appMenuBtn" aria-label="Open navigation menu" type="button"><span class="bars"></span></button>
+  <div class="app-menu-overlay" id="appMenuOverlay"></div>
+  <aside class="app-menu-panel" id="appMenuPanel" aria-hidden="true">
+    <div class="app-menu-head">
+      <div class="app-menu-title">Navigation</div>
+      <button class="app-menu-close" id="appMenuClose" type="button" aria-label="Close navigation menu">&times;</button>
+    </div>
+    <nav class="app-menu-links">
+      <a class="app-menu-link home" data-page="index.html" href="index.html"><span class="dot"></span><span>Home</span></a>
+      <a class="app-menu-link zerg" data-page="zerg.html" href="zerg.html"><span class="dot"></span><span>Zerg</span></a>
+      <a class="app-menu-link protoss" data-page="protoss.html" href="protoss.html"><span class="dot"></span><span>Protoss</span></a>
+      <a class="app-menu-link terran" data-page="terran.html" href="terran.html"><span class="dot"></span><span>Terran</span></a>
+      <a class="app-menu-link missions" data-page="missions.html" href="missions.html"><span class="dot"></span><span>Missions</span></a>
+      <a class="app-menu-link rules" data-page="rules.html" href="rules.html"><span class="dot"></span><span>Rules</span></a>
+    </nav>
+    <div class="app-menu-spacer"></div>
+    <div class="app-menu-note">Jump between pages without losing your place.</div>
+  </aside>
+  <script>
+    (function(){
+      const btn = document.getElementById('appMenuBtn');
+      const overlay = document.getElementById('appMenuOverlay');
+      const panel = document.getElementById('appMenuPanel');
+      const closeBtn = document.getElementById('appMenuClose');
+      if(!btn || !overlay || !panel || !closeBtn) return;
+      const setOpen = (open) => {
+        overlay.classList.toggle('open', open);
+        panel.classList.toggle('open', open);
+        panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+        document.body.style.overflow = open ? 'hidden' : '';
+      };
+      btn.addEventListener('click', () => setOpen(true));
+      closeBtn.addEventListener('click', () => setOpen(false));
+      overlay.addEventListener('click', () => setOpen(false));
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+      const current = (location.pathname.split('/').pop() || 'terran.html').toLowerCase();
+      document.querySelectorAll('.app-menu-link').forEach(link => {
+        const page = (link.getAttribute('data-page') || '').toLowerCase();
+        if (page === current) link.classList.add('active');
+      });
+    })();
+  </script>
+
 </body>
 </html>
