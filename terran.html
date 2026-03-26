@@ -2215,9 +2215,7 @@
       html += '<div class="tab-header"><div class="tab-title">Tactical Cards</div></div>';
       
       const tacticalCategories = [
-        { id: 'creep', name: 'Creep', desc: 'Spread and buff creep mechanics' },
-        { id: 'combat', name: 'Combat', desc: 'Improve attacks and defense' },
-        { id: 'positioning', name: 'Positioning', desc: 'Deployment, ambush, detection' }
+        { id: 'economy', name: 'Infrastructure', desc: 'Buildings and army support cards' }
       ];
       
       const renderTacticalCard = (card) => {
@@ -2246,7 +2244,7 @@
       };
       
       tacticalCategories.forEach(cat => {
-        const cardsInCat = ZERG_TACTICAL_CARDS.filter(c => c.category === cat.id);
+        const cardsInCat = ZERG_TACTICAL_CARDS;
         if (cardsInCat.length > 0) {
           html += '<div class="tactical-category-header"><span class="tactical-category-name">' + cat.name + '</span><span class="tactical-category-desc">' + cat.desc + '</span></div>';
           cardsInCat.forEach(card => {
